@@ -50,9 +50,9 @@ function NotSharedState() {
     <div className="bg-dot-surface rounded-4xl p-6 flex flex-col items-center text-center gap-4">
       <CatPeeking className="w-20 h-12 text-dot-rose" />
       <div>
-        <p className="text-lg font-bold text-dot-text">Not shared yet</p>
+        <p className="text-lg font-bold text-dot-text">No data yet</p>
         <p className="text-sm font-medium text-dot-muted mt-1.5 leading-relaxed max-w-[240px] mx-auto">
-          Ask your child to open Settings in the app and turn on sharing for you.
+          Add the first period day from the Calendar tab.
         </p>
       </div>
     </div>
@@ -61,6 +61,7 @@ function NotSharedState() {
 
 function SharedState({ data }) {
   const { period_summary: ps, prediction } = data
+  // share_level field removed — parents always see full data
 
   return (
     <div className="flex flex-col gap-4">
@@ -105,14 +106,6 @@ function SharedState({ data }) {
         />
       )}
 
-      {/* Visibility badge */}
-      <div className="bg-dot-sage-light rounded-3xl px-5 py-4 flex items-center gap-3">
-        <span className="text-lg">🔒</span>
-        <div>
-          <p className="text-xs font-bold text-dot-text">Shared visibility</p>
-          <p className="text-sm font-medium text-dot-muted mt-0.5">{shareLevelLabel(data.share_level)}</p>
-        </div>
-      </div>
     </div>
   )
 }
@@ -162,11 +155,3 @@ function SummaryCard({ label, value, muted }) {
   )
 }
 
-function shareLevelLabel(level) {
-  return {
-    basic:      'Dates only',
-    flow:       'Dates and flow',
-    symptoms:   'Dates and symptoms',
-    everything: 'Almost everything',
-  }[level] || level
-}

@@ -14,40 +14,24 @@ class ParentDashboardController extends Controller
 
         $family = $parent->families()->first();
         if (! $family) {
-            return response()->json($this->notShared('No family found.'));
+            return response()->json($this->noData('No family found.'));
         }
 
         $child = $family->users()->where('users.role', 'child')->first();
         if (! $child) {
-            return response()->json($this->notShared('No child found in family.'));
+            return response()->json($this->noData('No child found in family.'));
         }
 
         $profile = $child->cycleProfile;
         if (! $profile) {
-            return response()->json($this->notShared('No cycle profile yet.'));
+            return response()->json($this->noData('No cycle profile yet.'));
         }
 
-        // Determine whether this parent has been granted access.
-        $parentUsers = $family->parentUsers();
-        $parentIndex = $parentUsers->search(fn ($u) => $u->id === $parent->id);
-
-        $shareGranted = match ($parentIndex) {
-            0       => (bool) $profile->share_with_parent_1,
-            1       => (bool) $profile->share_with_parent_2,
-            default => false,
-        };
-
-        if (! $shareGranted) {
-            return response()->json($this->notShared());
-        }
-
-        $shareLevel = $profile->share_level;
-        $prediction = app(PredictionService::class)->predict($profile);
-
-        // Build a period range summary from the most recent consecutive block.
+        // Parents always have full access — no sharing gate.
+        $prediction    = app(PredictionService::class)->predict($profile);
         $periodSummary = $this->buildPeriodSummary($profile);
 
-        // Calendar data: current-month period days with symptoms eager-loaded.
+        // Calendar: current month, all period days, full detail.
         $month = now()->format('Y-m');
         $calendarLogs = $profile->periodLogs()
             ->with('symptoms')
@@ -57,28 +41,20 @@ class ParentDashboardController extends Controller
             ->orderBy('date')
             ->get();
 
-        $calendar = $calendarLogs->map(function ($log) use ($shareLevel) {
-            $entry = ['date' => Carbon::parse($log->date)->format('Y-m-d')];
-            if (in_array($shareLevel, ['flow', 'symptoms', 'everything'])) {
-                $entry['flow'] = $log->flow;
-            }
-            if (in_array($shareLevel, ['symptoms', 'everything'])) {
-                $entry['symptoms'] = $log->symptoms->pluck('symptom_type')->values()->all();
-            }
-            return $entry;
-        });
+        $calendar = $calendarLogs->map(fn ($log) => [
+            'date'     => Carbon::parse($log->date)->format('Y-m-d'),
+            'flow'     => $log->flow,
+            'symptoms' => $log->symptoms->pluck('symptom_type')->values()->all(),
+        ]);
 
         return response()->json([
             'shared'         => true,
-            'share_level'    => $shareLevel,
             'period_summary' => $periodSummary,
             'prediction'     => $prediction,
             'calendar'       => $calendar,
         ]);
     }
 
-    // Build a summary of the most recent period block.
-    // Returns null if there are no period days at all.
     private function buildPeriodSummary($profile): ?array
     {
         $allLogs = $profile->periodLogs()
@@ -90,7 +66,6 @@ class ParentDashboardController extends Controller
             return null;
         }
 
-        // Split logs into consecutive blocks.
         $blocks = [];
         $block  = [];
 
@@ -114,10 +89,8 @@ class ParentDashboardController extends Controller
             $blocks[] = $block;
         }
 
-        // Use the most recent block.
         $lastBlock = end($blocks);
 
-        // Find the cycle-start marker, falling back to the first day of the block.
         $startLog = collect($lastBlock)->firstWhere('is_cycle_start', true);
         $hasCycleStartMarker = $startLog !== null;
 
@@ -125,8 +98,8 @@ class ParentDashboardController extends Controller
             $startLog = $lastBlock[0];
         }
 
-        $startDate   = Carbon::parse($startLog->date);
-        $lastDate    = Carbon::parse(end($lastBlock)->date);
+        $startDate    = Carbon::parse($startLog->date);
+        $lastDate     = Carbon::parse(end($lastBlock)->date);
         $durationDays = (int) $startDate->diffInDays($lastDate) + 1;
 
         return [
@@ -137,11 +110,10 @@ class ParentDashboardController extends Controller
         ];
     }
 
-    private function notShared(?string $message = null): array
+    private function noData(?string $message = null): array
     {
         $payload = [
             'shared'         => false,
-            'share_level'    => null,
             'period_summary' => null,
             'prediction'     => ['status' => 'none'],
             'calendar'       => [],
