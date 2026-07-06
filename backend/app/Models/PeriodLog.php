@@ -12,6 +12,7 @@ class PeriodLog extends Model
         'is_period_day',
         'flow',
         'created_by_user_id',
+        'updated_by_user_id',
     ];
 
     protected $casts = [
@@ -32,5 +33,10 @@ class PeriodLog extends Model
     public function createdBy()
     {
         return $this->belongsTo(User::class, 'created_by_user_id');
+    }
+
+    public function updatedBy()
+    {
+        return $this->belongsTo(User::class, 'updated_by_user_id');
     }
 }

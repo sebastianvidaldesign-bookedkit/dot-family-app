@@ -27,7 +27,7 @@ export default function ParentAccount() {
 
       <div className="bg-dot-sage-light rounded-3xl px-5 py-4 mb-8">
         <p className="text-sm font-medium text-dot-text leading-relaxed">
-          This is a read-only view. Only your child can update data or change sharing settings.
+          Everyone in the family can help keep the calendar updated.
         </p>
       </div>
 

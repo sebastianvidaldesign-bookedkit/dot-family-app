@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\CycleProfileController;
+use App\Http\Controllers\FamilyCalendarController;
 use App\Http\Controllers\NoteController;
 use App\Http\Controllers\ParentDashboardController;
 use App\Http\Controllers\PeriodLogController;
@@ -49,6 +50,14 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('notes', [NoteController::class, 'store']);
         Route::put('notes/{note}', [NoteController::class, 'update']);
         Route::delete('notes/{note}', [NoteController::class, 'destroy']);
+    });
+
+    // Family calendar — shared by child, dad, and mom
+    // All three read/write the child's single cycle_profile via family membership
+    Route::prefix('family')->group(function () {
+        Route::get('calendar',   [FamilyCalendarController::class, 'index']);
+        Route::post('calendar',  [FamilyCalendarController::class, 'upsert']);
+        Route::get('prediction', [FamilyCalendarController::class, 'prediction']);
     });
 
     // Parent-only routes
