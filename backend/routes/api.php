@@ -5,7 +5,26 @@ use App\Http\Controllers\CycleProfileController;
 use App\Http\Controllers\NoteController;
 use App\Http\Controllers\ParentDashboardController;
 use App\Http\Controllers\PeriodLogController;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Route;
+
+// Health check — no auth required
+Route::get('health', function () {
+    try {
+        DB::connection()->getPdo();
+        $db = 'connected';
+    } catch (\Throwable) {
+        $db = 'unavailable';
+    }
+
+    $ok = $db === 'connected';
+
+    return response()->json([
+        'ok'       => $ok,
+        'app'      => 'Dot',
+        'database' => $db,
+    ], $ok ? 200 : 503);
+});
 
 // Public auth routes
 Route::prefix('auth')->group(function () {
