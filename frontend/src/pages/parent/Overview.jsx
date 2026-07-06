@@ -50,9 +50,9 @@ function NotSharedState() {
     <div className="bg-dot-surface rounded-4xl p-6 flex flex-col items-center text-center gap-4">
       <CatPeeking className="w-20 h-12 text-dot-rose" />
       <div>
-        <p className="text-lg font-bold text-dot-text">No entries yet</p>
+        <p className="text-lg font-bold text-dot-text">Not shared yet</p>
         <p className="text-sm font-medium text-dot-muted mt-1.5 leading-relaxed max-w-[240px] mx-auto">
-          Add a period day from the Calendar tab, and Dot will start learning.
+          Ask your child to open Settings in the app and turn on sharing for you.
         </p>
       </div>
     </div>
