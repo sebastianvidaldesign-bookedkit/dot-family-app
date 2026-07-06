@@ -152,13 +152,22 @@ SANCTUM_STATEFUL_DOMAINS=<your-frontend-domain>.railway.app
 > directly from the Postgres plugin. No credentials are hardcoded in the repo.
 
 4. Deploy. The start command in `railway.json` runs `php artisan migrate --force` automatically.
-5. After first deploy, seed the database once:
+5. After first deploy, create the three family accounts using the production setup command:
 
 ```bash
-railway run --service=backend php artisan db:seed --force
+railway run --service=backend php artisan dot:create-family-users \
+  --child-email="child@yourdomain.com" \
+  --child-password="choose-a-strong-password" \
+  --dad-email="dad@yourdomain.com" \
+  --dad-password="choose-a-strong-password" \
+  --mom-email="mom@yourdomain.com" \
+  --mom-password="choose-a-strong-password"
 ```
 
-**Change the seed passwords immediately after seeding.**
+The command is **idempotent** — safe to run again if you need to change passwords or recover from a mistake. It will update existing accounts without duplicating data.
+
+> **Never commit real email addresses or passwords to the repo.** Pass them only via
+> the Railway CLI or Railway's environment variable UI.
 
 6. Confirm the backend is healthy:
 
