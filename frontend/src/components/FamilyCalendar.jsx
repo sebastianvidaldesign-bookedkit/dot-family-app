@@ -26,7 +26,6 @@ const SYMPTOM_LABEL = Object.fromEntries(SYMPTOMS.map(s => [s.value, s.label]))
 
 const todayKey = format(new Date(), 'yyyy-MM-dd')
 
-// Prediction statuses that include an estimate range
 const HAS_RANGE = new Set(['fallback', 'learned'])
 
 export default function FamilyCalendar() {
@@ -49,11 +48,8 @@ export default function FamilyCalendar() {
     })
   }, [monthKey])
 
-  // logMap holds ALL fetched logs so re-tapping a saved "not a period day" date
-  // pre-populates the sheet correctly instead of opening blank.
   const logMap = Object.fromEntries(logs.map(l => [l.date, l]))
 
-  // Period entries sorted newest-first for the entries list.
   const periodEntries = logs
     .filter(l => l.is_period_day)
     .sort((a, b) => b.date.localeCompare(a.date))
@@ -72,7 +68,10 @@ export default function FamilyCalendar() {
   function openDayByKey(key) {
     setSelected(key)
     setSaveError(null)
-    setEditLog(logMap[key] || { date: key, is_period_day: false, flow: null, symptoms: [], updated_by: null })
+    setEditLog(logMap[key] || {
+      date: key, is_period_day: false, is_cycle_start: false,
+      flow: null, symptoms: [], updated_by: null,
+    })
   }
 
   function openDay(date) {
@@ -85,12 +84,12 @@ export default function FamilyCalendar() {
     setSaveError(null)
     try {
       const { data } = await client.post('/family/calendar', {
-        date:          editLog.date,
-        is_period_day: editLog.is_period_day,
-        flow:          editLog.is_period_day ? editLog.flow : null,
-        symptoms:      editLog.is_period_day ? (editLog.symptoms || []) : [],
+        date:           editLog.date,
+        is_period_day:  editLog.is_period_day,
+        is_cycle_start: editLog.is_period_day ? (editLog.is_cycle_start || false) : false,
+        flow:           editLog.is_period_day ? editLog.flow : null,
+        symptoms:       editLog.is_period_day ? (editLog.symptoms || []) : [],
       })
-      // Always keep the log in state so logMap stays accurate for re-taps.
       setLogs(prev => [...prev.filter(l => l.date !== data.date), data])
       setSelected(null)
     } catch {
@@ -110,41 +109,42 @@ export default function FamilyCalendar() {
   }
 
   return (
-    <div className="px-4 pt-8 pb-8">
-      {/* Month navigation */}
-      <div className="flex items-center justify-between mb-6 px-1">
+    <div className="px-4 pt-6 pb-6">
+      {/* Month navigation — compact */}
+      <div className="flex items-center justify-between mb-4 px-1">
         <button
           onClick={() => setCurrent(d => new Date(d.getFullYear(), d.getMonth() - 1))}
-          className="w-10 h-10 flex items-center justify-center rounded-full active:bg-dot-surface text-dot-muted text-xl font-bold"
+          className="w-9 h-9 flex items-center justify-center rounded-full active:bg-dot-surface text-dot-muted text-xl font-bold"
           aria-label="Previous month"
         >
           ‹
         </button>
-        <h2 className="text-lg font-bold text-dot-text">{format(current, 'MMMM yyyy')}</h2>
+        <h2 className="text-base font-bold text-dot-text">{format(current, 'MMMM yyyy')}</h2>
         <button
           onClick={() => setCurrent(d => new Date(d.getFullYear(), d.getMonth() + 1))}
-          className="w-10 h-10 flex items-center justify-center rounded-full active:bg-dot-surface text-dot-muted text-xl font-bold"
+          className="w-9 h-9 flex items-center justify-center rounded-full active:bg-dot-surface text-dot-muted text-xl font-bold"
           aria-label="Next month"
         >
           ›
         </button>
       </div>
 
-      {/* Weekday headers */}
-      <div className="grid grid-cols-7 mb-1">
+      {/* Weekday headers — tight */}
+      <div className="grid grid-cols-7 mb-0.5">
         {['Su','Mo','Tu','We','Th','Fr','Sa'].map(d => (
-          <div key={d} className="text-center text-2xs font-bold text-dot-muted py-1 tracking-wide uppercase">
+          <div key={d} className="text-center text-2xs font-bold text-dot-muted py-0.5 tracking-wide uppercase">
             {d}
           </div>
         ))}
       </div>
 
-      {/* Calendar grid */}
+      {/* Calendar grid — 20% shorter day cells */}
       <div className="grid grid-cols-7">
         {calDays.map(date => {
-          const key      = format(date, 'yyyy-MM-dd')
-          const log      = logMap[key]
+          const key       = format(date, 'yyyy-MM-dd')
+          const log       = logMap[key]
           const isPeriod  = log?.is_period_day
+          const isFirst   = log?.is_cycle_start
           const predicted = !isPeriod && isPredicted(date)
           const inMonth   = isSameMonth(date, current)
           const today     = isToday(date)
@@ -154,11 +154,11 @@ export default function FamilyCalendar() {
               key={key}
               onClick={() => openDay(date)}
               disabled={!inMonth}
-              className="flex items-center justify-center py-1"
-              aria-label={`${format(date, 'MMMM d')}${isPeriod ? ', period day' : ''}`}
+              className="flex flex-col items-center justify-center py-0.5 gap-0.5"
+              aria-label={`${format(date, 'MMMM d')}${isPeriod ? ', period day' : ''}${isFirst ? ', first day' : ''}`}
             >
               <span className={[
-                'w-10 h-10 flex items-center justify-center rounded-full text-sm font-semibold transition-colors',
+                'w-8 h-8 flex items-center justify-center rounded-full text-sm font-semibold transition-colors',
                 !inMonth  && 'text-dot-border cursor-default',
                 isPeriod  && 'bg-dot-rose text-white',
                 predicted && 'border-2 border-dashed border-dot-rose-mid text-dot-rose',
@@ -167,15 +167,20 @@ export default function FamilyCalendar() {
               ].filter(Boolean).join(' ')}>
                 {format(date, 'd')}
               </span>
+              {/* Tiny dot under the first day of a period */}
+              {isFirst && inMonth && (
+                <span className="w-1 h-1 rounded-full bg-dot-rose-mid" aria-hidden="true" />
+              )}
             </button>
           )
         })}
       </div>
 
       {/* Legend */}
-      <div className="flex items-center gap-5 mt-4 mb-6 px-1">
+      <div className="flex items-center gap-5 mt-3 mb-5 px-1">
         <LegendItem filled label="Period day" />
         <LegendItem dashed label="Estimated" />
+        <LegendItem dot    label="First day" />
       </div>
 
       {/* Entries this month */}
@@ -184,7 +189,6 @@ export default function FamilyCalendar() {
           <p className="text-xs font-bold text-dot-muted uppercase tracking-wider">
             Entries this month
           </p>
-          {/* Quick-add: opens today's entry (or today's blank sheet) */}
           <button
             onClick={() => openDayByKey(todayKey)}
             className="flex items-center gap-1 h-8 px-3 rounded-full bg-dot-rose/10 border border-dot-rose/20 text-xs font-bold text-dot-rose active:bg-dot-rose/20 transition-colors"
@@ -216,10 +220,16 @@ export default function FamilyCalendar() {
       {selected && editLog && (
         <BottomSheet
           editLog={editLog}
+          setEditLog={setEditLog}
           onClose={() => setSelected(null)}
           onSave={saveEdit}
           onToggleSymptom={toggleSymptom}
-          onTogglePeriod={() => setEditLog(prev => ({ ...prev, is_period_day: !prev.is_period_day }))}
+          onTogglePeriod={() => setEditLog(prev => ({
+            ...prev,
+            is_period_day: !prev.is_period_day,
+            // reset first-day marker when toggling period off
+            is_cycle_start: prev.is_period_day ? false : prev.is_cycle_start,
+          }))}
           onSetFlow={v => setEditLog(prev => ({ ...prev, flow: v }))}
           saving={saving}
           saveError={saveError}
@@ -258,7 +268,9 @@ function EntryCard({ log, onTap }) {
           <p className="text-sm font-bold text-dot-text">
             {format(parseISO(log.date), 'MMM d')}
           </p>
-          <p className="text-xs font-semibold text-dot-rose mt-0.5">Period day</p>
+          <p className="text-xs font-semibold text-dot-rose mt-0.5">
+            Period day{log.is_cycle_start ? ' · First day' : ''}
+          </p>
 
           {log.flow && (
             <p className="text-xs font-medium text-dot-muted mt-1.5">
@@ -291,14 +303,15 @@ function EntryCard({ log, onTap }) {
 
 // ── Bottom sheet ──────────────────────────────────────────────────────────────
 
-function BottomSheet({ editLog, onClose, onSave, onToggleSymptom, onTogglePeriod, onSetFlow, saving, saveError }) {
+function BottomSheet({ editLog, setEditLog, onClose, onSave, onToggleSymptom, onTogglePeriod, onSetFlow, saving, saveError }) {
   return (
     <div
       className="fixed inset-0 z-50 flex items-end justify-center bg-black/40"
       onClick={onClose}
     >
       <div
-        className="w-full max-w-[430px] bg-dot-white rounded-t-[2rem] px-5 pb-8 pt-4 shadow-2xl"
+        className="w-full max-w-[430px] bg-dot-white rounded-t-[2rem] px-5 pb-10 pt-4 shadow-2xl"
+        style={{ paddingBottom: 'calc(2.5rem + env(safe-area-inset-bottom, 0px))' }}
         onClick={e => e.stopPropagation()}
       >
         <div className="w-10 h-1.5 bg-dot-border rounded-full mx-auto mb-5" />
@@ -312,10 +325,25 @@ function BottomSheet({ editLog, onClose, onSave, onToggleSymptom, onTogglePeriod
           )}
         </div>
 
-        <div className="flex items-center justify-between mb-5 bg-dot-surface rounded-2xl px-4 py-3">
+        {/* Period day toggle */}
+        <div className="flex items-center justify-between mb-3 bg-dot-surface rounded-2xl px-4 py-3">
           <span className="text-sm font-bold text-dot-text">Period day</span>
           <Toggle value={editLog.is_period_day} onChange={onTogglePeriod} />
         </div>
+
+        {/* First day toggle — only when period day is on */}
+        {editLog.is_period_day && (
+          <div className="flex items-center justify-between mb-5 bg-dot-rose-light rounded-2xl px-4 py-3">
+            <div>
+              <span className="text-sm font-bold text-dot-text">First day of period</span>
+              <p className="text-xs text-dot-muted mt-0.5">Helps estimate your next period</p>
+            </div>
+            <Toggle
+              value={editLog.is_cycle_start || false}
+              onChange={() => setEditLog(prev => ({ ...prev, is_cycle_start: !prev.is_cycle_start }))}
+            />
+          </div>
+        )}
 
         {editLog.is_period_day && (
           <>
@@ -380,21 +408,27 @@ function Toggle({ value, onChange }) {
       onClick={onChange}
       role="switch"
       aria-checked={value}
-      className={`relative w-12 h-7 rounded-full transition-colors ${value ? 'bg-dot-rose' : 'bg-dot-border'}`}
+      className={`relative w-12 h-7 rounded-full transition-colors flex-shrink-0 ${value ? 'bg-dot-rose' : 'bg-dot-border'}`}
     >
       <span className={`absolute top-1 w-5 h-5 rounded-full bg-white shadow transition-all ${value ? 'left-6' : 'left-1'}`} />
     </button>
   )
 }
 
-function LegendItem({ filled, dashed, label }) {
+function LegendItem({ filled, dashed, dot, label }) {
   return (
     <div className="flex items-center gap-1.5">
-      <span className={[
-        'w-4 h-4 rounded-full flex-shrink-0',
-        filled && 'bg-dot-rose',
-        dashed && 'border-2 border-dashed border-dot-rose-mid',
-      ].filter(Boolean).join(' ')} />
+      {dot ? (
+        <span className="w-4 h-4 flex items-center justify-center flex-shrink-0">
+          <span className="w-2 h-2 rounded-full bg-dot-rose-mid" />
+        </span>
+      ) : (
+        <span className={[
+          'w-4 h-4 rounded-full flex-shrink-0',
+          filled && 'bg-dot-rose',
+          dashed && 'border-2 border-dashed border-dot-rose-mid',
+        ].filter(Boolean).join(' ')} />
+      )}
       <span className="text-xs font-semibold text-dot-muted">{label}</span>
     </div>
   )

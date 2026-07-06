@@ -12,8 +12,6 @@ use Illuminate\Http\Request;
 class FamilyCalendarController extends Controller
 {
     // Resolve the ONE child-owned cycle_profile for this user's family.
-    // Child users return their own profile.
-    // Parent users look up their family, find the child, and return the child's profile.
     private function resolveProfile(User $user): ?CycleProfile
     {
         if ($user->isChild()) {
@@ -57,11 +55,12 @@ class FamilyCalendarController extends Controller
     public function upsert(Request $request)
     {
         $data = $request->validate([
-            'date'          => 'required|date_format:Y-m-d',
-            'is_period_day' => 'required|boolean',
-            'flow'          => 'nullable|in:light,medium,heavy,not_sure',
-            'symptoms'      => 'nullable|array',
-            'symptoms.*'    => 'in:cramps,tired,headache,emotional,nothing',
+            'date'           => 'required|date_format:Y-m-d',
+            'is_period_day'  => 'required|boolean',
+            'is_cycle_start' => 'sometimes|boolean',
+            'flow'           => 'nullable|in:light,medium,heavy,not_sure',
+            'symptoms'       => 'nullable|array',
+            'symptoms.*'     => 'in:cramps,tired,headache,emotional,nothing',
         ]);
 
         $user    = $request->user();
@@ -71,10 +70,16 @@ class FamilyCalendarController extends Controller
             return response()->json(['message' => 'No family calendar found.'], 404);
         }
 
+        // is_cycle_start only makes sense when is_period_day is true.
+        $isCycleStart = $data['is_period_day']
+            ? (bool) ($data['is_cycle_start'] ?? false)
+            : false;
+
         $existing = $profile->periodLogs()->where('date', $data['date'])->first();
 
         if ($existing) {
             $existing->is_period_day      = $data['is_period_day'];
+            $existing->is_cycle_start     = $isCycleStart;
             $existing->flow               = $data['is_period_day'] ? ($data['flow'] ?? null) : null;
             $existing->updated_by_user_id = $user->id;
             $existing->save();
@@ -83,6 +88,7 @@ class FamilyCalendarController extends Controller
             $log = $profile->periodLogs()->create([
                 'date'               => $data['date'],
                 'is_period_day'      => $data['is_period_day'],
+                'is_cycle_start'     => $isCycleStart,
                 'flow'               => $data['is_period_day'] ? ($data['flow'] ?? null) : null,
                 'created_by_user_id' => $user->id,
                 'updated_by_user_id' => $user->id,
@@ -116,8 +122,6 @@ class FamilyCalendarController extends Controller
 
     private function formatLog(PeriodLog $log, User $viewer): array
     {
-        // Prefer updated_by for attribution; fall back to created_by for entries
-        // saved before this field existed.
         $editor = $log->updated_by_user_id ? $log->updatedBy : $log->createdBy;
 
         $updatedBy = null;
@@ -126,12 +130,13 @@ class FamilyCalendarController extends Controller
         }
 
         return [
-            'id'            => $log->id,
-            'date'          => $log->date->format('Y-m-d'),
-            'is_period_day' => $log->is_period_day,
-            'flow'          => $log->flow,
-            'symptoms'      => $log->symptoms->pluck('symptom_type')->values()->all(),
-            'updated_by'    => $updatedBy,
+            'id'             => $log->id,
+            'date'           => $log->date->format('Y-m-d'),
+            'is_period_day'  => $log->is_period_day,
+            'is_cycle_start' => $log->is_cycle_start,
+            'flow'           => $log->flow,
+            'symptoms'       => $log->symptoms->pluck('symptom_type')->values()->all(),
+            'updated_by'     => $updatedBy,
         ];
     }
 }

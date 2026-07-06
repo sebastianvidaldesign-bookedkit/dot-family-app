@@ -17,8 +17,6 @@ class ParentDashboardController extends Controller
             return response()->json($this->notShared('No family found.'));
         }
 
-        // Qualify users.role to avoid ambiguous column error in Postgres
-        // (both users and family_members tables have a role column)
         $child = $family->users()->where('users.role', 'child')->first();
         if (! $child) {
             return response()->json($this->notShared('No child found in family.'));
@@ -30,9 +28,8 @@ class ParentDashboardController extends Controller
         }
 
         // Determine whether this parent has been granted access.
-        // Parent position (0 = parent_1, 1 = parent_2) is determined by insertion order.
-        $parentUsers  = $family->parentUsers();
-        $parentIndex  = $parentUsers->search(fn ($u) => $u->id === $parent->id);
+        $parentUsers = $family->parentUsers();
+        $parentIndex = $parentUsers->search(fn ($u) => $u->id === $parent->id);
 
         $shareGranted = match ($parentIndex) {
             0       => (bool) $profile->share_with_parent_1,
@@ -47,31 +44,10 @@ class ParentDashboardController extends Controller
         $shareLevel = $profile->share_level;
         $prediction = app(PredictionService::class)->predict($profile);
 
-        // Find the most recent period start date
-        $lastPeriodStart = null;
-        $allPeriodDays = $profile->periodLogs()
-            ->where('is_period_day', true)
-            ->orderBy('date')
-            ->get();
+        // Build a period range summary from the most recent consecutive block.
+        $periodSummary = $this->buildPeriodSummary($profile);
 
-        if ($allPeriodDays->isNotEmpty()) {
-            $dateSet = $allPeriodDays
-                ->pluck('date')
-                ->map(fn ($d) => Carbon::parse($d)->format('Y-m-d'))
-                ->flip()
-                ->toArray();
-
-            foreach (array_keys($dateSet) as $dateStr) {
-                $dayBefore = Carbon::parse($dateStr)->subDay()->format('Y-m-d');
-                if (! isset($dateSet[$dayBefore])) {
-                    if ($lastPeriodStart === null || $dateStr > $lastPeriodStart) {
-                        $lastPeriodStart = $dateStr;
-                    }
-                }
-            }
-        }
-
-        // Calendar data: current-month period days with symptoms eager-loaded
+        // Calendar data: current-month period days with symptoms eager-loaded.
         $month = now()->format('Y-m');
         $calendarLogs = $profile->periodLogs()
             ->with('symptoms')
@@ -93,22 +69,82 @@ class ParentDashboardController extends Controller
         });
 
         return response()->json([
-            'shared'            => true,
-            'share_level'       => $shareLevel,
-            'last_period_start' => $lastPeriodStart,
-            'prediction'        => $prediction,
-            'calendar'          => $calendar,
+            'shared'         => true,
+            'share_level'    => $shareLevel,
+            'period_summary' => $periodSummary,
+            'prediction'     => $prediction,
+            'calendar'       => $calendar,
         ]);
+    }
+
+    // Build a summary of the most recent period block.
+    // Returns null if there are no period days at all.
+    private function buildPeriodSummary($profile): ?array
+    {
+        $allLogs = $profile->periodLogs()
+            ->where('is_period_day', true)
+            ->orderBy('date')
+            ->get();
+
+        if ($allLogs->isEmpty()) {
+            return null;
+        }
+
+        // Split logs into consecutive blocks.
+        $blocks = [];
+        $block  = [];
+
+        foreach ($allLogs as $log) {
+            $date = Carbon::parse($log->date);
+
+            if (empty($block)) {
+                $block[] = $log;
+            } else {
+                $prev = Carbon::parse(end($block)->date);
+                if ($date->diffInDays($prev) === 1) {
+                    $block[] = $log;
+                } else {
+                    $blocks[] = $block;
+                    $block    = [$log];
+                }
+            }
+        }
+
+        if (! empty($block)) {
+            $blocks[] = $block;
+        }
+
+        // Use the most recent block.
+        $lastBlock = end($blocks);
+
+        // Find the cycle-start marker, falling back to the first day of the block.
+        $startLog = collect($lastBlock)->firstWhere('is_cycle_start', true);
+        $hasCycleStartMarker = $startLog !== null;
+
+        if (! $startLog) {
+            $startLog = $lastBlock[0];
+        }
+
+        $startDate   = Carbon::parse($startLog->date);
+        $lastDate    = Carbon::parse(end($lastBlock)->date);
+        $durationDays = (int) $startDate->diffInDays($lastDate) + 1;
+
+        return [
+            'started'                => $startDate->format('Y-m-d'),
+            'last_logged_day'        => $lastDate->format('Y-m-d'),
+            'duration_days'          => $durationDays,
+            'has_cycle_start_marker' => $hasCycleStartMarker,
+        ];
     }
 
     private function notShared(?string $message = null): array
     {
         $payload = [
-            'shared'            => false,
-            'share_level'       => null,
-            'last_period_start' => null,
-            'prediction'        => ['status' => 'none'],
-            'calendar'          => [],
+            'shared'         => false,
+            'share_level'    => null,
+            'period_summary' => null,
+            'prediction'     => ['status' => 'none'],
+            'calendar'       => [],
         ];
 
         if ($message) {

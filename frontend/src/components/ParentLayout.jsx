@@ -8,7 +8,7 @@ const tabs = [
 
 export default function ParentLayout() {
   return (
-    <div className="flex flex-col w-full max-w-[430px] mx-auto min-h-[100dvh] bg-dot-bg">
+    <div className="flex flex-col w-full max-w-[430px] mx-auto h-[100dvh] bg-dot-bg">
       <main className="flex-1 overflow-y-auto overflow-x-hidden">
         <Outlet />
       </main>

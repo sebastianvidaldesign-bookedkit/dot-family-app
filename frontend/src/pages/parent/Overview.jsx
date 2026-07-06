@@ -50,9 +50,9 @@ function NotSharedState() {
     <div className="bg-dot-surface rounded-4xl p-6 flex flex-col items-center text-center gap-4">
       <CatPeeking className="w-20 h-12 text-dot-rose" />
       <div>
-        <p className="text-lg font-bold text-dot-text">Not shared yet</p>
+        <p className="text-lg font-bold text-dot-text">No entries yet</p>
         <p className="text-sm font-medium text-dot-muted mt-1.5 leading-relaxed max-w-[240px] mx-auto">
-          When sharing is turned on in the app, you'll see a summary here.
+          Add a period day from the Calendar tab, and Dot will start learning.
         </p>
       </div>
     </div>
@@ -60,37 +60,47 @@ function NotSharedState() {
 }
 
 function SharedState({ data }) {
+  const { period_summary: ps, prediction } = data
+
   return (
     <div className="flex flex-col gap-4">
-      {/* Last period */}
-      <SummaryCard
-        label="Last period started"
-        value={data.last_period_start
-          ? format(parseISO(data.last_period_start), 'MMMM d, yyyy')
-          : 'No data yet'}
-      />
+      {/* Period range summary */}
+      {ps ? (
+        <PeriodSummaryCard summary={ps} />
+      ) : (
+        <SummaryCard
+          label="Last period"
+          value="No entries yet"
+          muted
+        />
+      )}
 
       {/* Prediction */}
-      {(data.prediction?.status === 'fallback' || data.prediction?.status === 'learned') && (
+      {(prediction?.status === 'fallback' || prediction?.status === 'learned') && (
         <div className="bg-dot-rose-light rounded-4xl px-6 py-5">
           <div className="flex items-center gap-2 mb-2">
             <p className="text-xs font-bold text-dot-rose uppercase tracking-widest">Might start around</p>
-            {data.prediction.confidence_label && (
+            {prediction.confidence_label && (
               <span className="text-xs font-bold text-dot-rose-mid bg-dot-white px-2 py-0.5 rounded-full capitalize">
-                {data.prediction.confidence_label}
+                {prediction.confidence_label}
               </span>
             )}
           </div>
           <p className="text-2xl font-bold text-dot-rose">
-            {format(parseISO(data.prediction.range_start), 'MMM d')} – {format(parseISO(data.prediction.range_end), 'MMM d')}
+            {format(parseISO(prediction.range_start), 'MMM d')} – {format(parseISO(prediction.range_end), 'MMM d')}
+          </p>
+          <p className="text-xs font-medium text-dot-rose-mid mt-2">
+            {prediction.status === 'fallback'
+              ? 'First guess — Dot will learn over time.'
+              : 'Dot is learning your cycle.'}
           </p>
         </div>
       )}
 
-      {data.prediction?.status === 'none' && (
+      {prediction?.status === 'none' && (
         <SummaryCard
           label="Estimated next period"
-          value="Calendar is learning — check back soon"
+          value="Dot will learn as more days are added"
           muted
         />
       )}
@@ -103,6 +113,42 @@ function SharedState({ data }) {
           <p className="text-sm font-medium text-dot-muted mt-0.5">{shareLevelLabel(data.share_level)}</p>
         </div>
       </div>
+    </div>
+  )
+}
+
+function PeriodSummaryCard({ summary }) {
+  const started    = format(parseISO(summary.started),        'MMM d')
+  const lastLogged = format(parseISO(summary.last_logged_day), 'MMM d')
+  const same       = summary.started === summary.last_logged_day
+
+  return (
+    <div className="bg-dot-white rounded-3xl border border-dot-border px-5 py-4">
+      <p className="text-xs font-bold text-dot-muted uppercase tracking-wide mb-3">Last period</p>
+
+      <div className="flex flex-col gap-1.5">
+        <Row label="Started" value={started} />
+        {!same && <Row label="Last logged day" value={lastLogged} />}
+        <Row
+          label={same ? 'Duration so far' : 'Duration'}
+          value={summary.duration_days === 1 ? '1 day' : `${summary.duration_days} days`}
+        />
+      </div>
+
+      {!summary.has_cycle_start_marker && (
+        <p className="text-xs text-dot-muted mt-3 leading-relaxed">
+          Mark the first day in the Calendar to improve estimates.
+        </p>
+      )}
+    </div>
+  )
+}
+
+function Row({ label, value }) {
+  return (
+    <div className="flex items-baseline justify-between gap-3">
+      <span className="text-sm font-medium text-dot-muted">{label}</span>
+      <span className="text-sm font-bold text-dot-text">{value}</span>
     </div>
   )
 }
