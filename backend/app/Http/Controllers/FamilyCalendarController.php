@@ -106,8 +106,8 @@ class FamilyCalendarController extends Controller
         $profile = $this->resolveProfile($request->user());
         if (! $profile) {
             return response()->json([
-                'status'  => 'learning',
-                'message' => 'Still getting to know the cycle.',
+                'status'  => 'none',
+                'message' => 'Your calendar will learn as you add days.',
             ]);
         }
 

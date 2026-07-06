@@ -71,20 +71,26 @@ function SharedState({ data }) {
       />
 
       {/* Prediction */}
-      {data.prediction?.status === 'predicted' && (
+      {(data.prediction?.status === 'fallback' || data.prediction?.status === 'learned') && (
         <div className="bg-dot-rose-light rounded-4xl px-6 py-5">
-          <p className="text-xs font-bold text-dot-rose uppercase tracking-widest mb-2">Estimated next period</p>
+          <div className="flex items-center gap-2 mb-2">
+            <p className="text-xs font-bold text-dot-rose uppercase tracking-widest">Might start around</p>
+            {data.prediction.confidence_label && (
+              <span className="text-xs font-bold text-dot-rose-mid bg-dot-white px-2 py-0.5 rounded-full capitalize">
+                {data.prediction.confidence_label}
+              </span>
+            )}
+          </div>
           <p className="text-2xl font-bold text-dot-rose">
             {format(parseISO(data.prediction.range_start), 'MMM d')} – {format(parseISO(data.prediction.range_end), 'MMM d')}
           </p>
-          <p className="text-xs font-medium text-dot-rose-mid mt-1">Rough estimate only</p>
         </div>
       )}
 
-      {data.prediction?.status === 'learning' && (
+      {data.prediction?.status === 'none' && (
         <SummaryCard
           label="Estimated next period"
-          value="Still learning — check back soon"
+          value="Calendar is learning — check back soon"
           muted
         />
       )}

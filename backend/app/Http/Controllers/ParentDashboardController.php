@@ -107,7 +107,7 @@ class ParentDashboardController extends Controller
             'shared'            => false,
             'share_level'       => null,
             'last_period_start' => null,
-            'prediction'        => ['status' => 'learning'],
+            'prediction'        => ['status' => 'none'],
             'calendar'          => [],
         ];
 

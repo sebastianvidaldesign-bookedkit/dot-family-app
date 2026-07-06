@@ -8,7 +8,7 @@ export default function NextPeriod() {
   const [loading, setLoading]       = useState(true)
 
   useEffect(() => {
-    client.get('/period-logs/prediction')
+    client.get('/family/prediction')
       .then(({ data }) => setPrediction(data))
       .finally(() => setLoading(false))
   }, [])
@@ -24,8 +24,9 @@ export default function NextPeriod() {
         </div>
       )}
 
-      {!loading && prediction?.status === 'learning' && <LearningCard />}
-      {!loading && prediction?.status === 'predicted' && <PredictionCard prediction={prediction} />}
+      {!loading && prediction?.status === 'none'     && <LearningCard />}
+      {!loading && prediction?.status === 'fallback' && <PredictionCard prediction={prediction} />}
+      {!loading && prediction?.status === 'learned'  && <PredictionCard prediction={prediction} />}
     </div>
   )
 }
@@ -38,7 +39,7 @@ function LearningCard() {
         <div>
           <p className="text-lg font-bold text-dot-text">Tiny reminder</p>
           <p className="text-sm font-medium text-dot-muted mt-1.5 leading-relaxed max-w-[260px] mx-auto">
-            Your calendar is learning. After a couple of cycles, it'll give you a rough idea of what's coming.
+            Your calendar will learn as you add days.
           </p>
         </div>
       </div>
@@ -56,18 +57,30 @@ function PredictionCard({ prediction }) {
   const rangeStart = format(parseISO(prediction.range_start), 'MMM d')
   const rangeEnd   = format(parseISO(prediction.range_end),   'MMM d')
   const lastStart  = format(parseISO(prediction.last_period_start), 'MMMM d')
+  const isFallback = prediction.status === 'fallback'
 
   return (
     <div className="flex flex-col gap-4">
       {/* Main estimate card */}
       <div className="bg-dot-rose-light rounded-4xl px-6 py-6">
-        <p className="text-xs font-bold text-dot-rose uppercase tracking-widest mb-3">Estimated next period</p>
+        <div className="flex items-center gap-2 mb-3">
+          <p className="text-xs font-bold text-dot-rose uppercase tracking-widest">
+            Might start around
+          </p>
+          {prediction.confidence_label && (
+            <span className="text-xs font-bold text-dot-rose-mid bg-dot-white px-2 py-0.5 rounded-full capitalize">
+              {prediction.confidence_label}
+            </span>
+          )}
+        </div>
         <p className="text-[34px] font-bold text-dot-rose leading-none mb-1">
           {rangeStart} – {rangeEnd}
         </p>
-        <p className="text-sm font-medium text-dot-rose-mid mt-2">
-          About every {prediction.avg_cycle_days} days
-        </p>
+        {!isFallback && (
+          <p className="text-sm font-medium text-dot-rose-mid mt-2">
+            About every {prediction.avg_cycle_days} days
+          </p>
+        )}
       </div>
 
       {/* Last period */}
@@ -76,10 +89,11 @@ function PredictionCard({ prediction }) {
         <p className="text-base font-bold text-dot-text">{lastStart}</p>
       </div>
 
-      {/* Gentle disclaimer */}
+      {/* Calm disclaimer */}
       <div className="bg-dot-sage-light rounded-3xl px-5 py-4">
         <p className="text-sm font-medium text-dot-text leading-relaxed">
-          Cycles can be irregular, especially at first. This is only a guess — your body knows its own timing.
+          {prediction.message}
+          {' '}Dot will learn over time.
         </p>
       </div>
     </div>

@@ -71,8 +71,8 @@ class PeriodLogController extends Controller
         $profile = $request->user()->cycleProfile;
         if (! $profile) {
             return response()->json([
-                'status'  => 'learning',
-                'message' => 'Still getting to know your cycle.',
+                'status'  => 'none',
+                'message' => 'Your calendar will learn as you add days.',
             ]);
         }
 
