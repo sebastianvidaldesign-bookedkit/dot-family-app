@@ -5,8 +5,11 @@ import Today from './pages/child/Today'
 import CalendarView from './pages/child/CalendarView'
 import NextPeriod from './pages/child/NextPeriod'
 import Settings from './pages/child/Settings'
-import Dashboard from './pages/parent/Dashboard'
+import Overview from './pages/parent/Overview'
+import ParentCalendar from './pages/parent/ParentCalendar'
+import ParentAccount from './pages/parent/ParentAccount'
 import ChildLayout from './components/ChildLayout'
+import ParentLayout from './components/ParentLayout'
 
 function RoleRoute({ role, children }) {
   const { user } = useAuth()
@@ -20,39 +23,46 @@ function RootRedirect() {
   if (!user) return <Navigate to="/login" replace />
   return user.role === 'child'
     ? <Navigate to="/today" replace />
-    : <Navigate to="/parent" replace />
+    : <Navigate to="/parent/overview" replace />
 }
 
 export default function App() {
   return (
     <AuthProvider>
       <BrowserRouter>
-        <Routes>
-          <Route path="/login" element={<Login />} />
+        {/* Full-height centering wrapper — phone viewport on desktop */}
+        <div className="min-h-[100dvh] flex justify-center bg-dot-border/30">
+          <Routes>
+            <Route path="/login" element={<Login />} />
+            <Route path="/" element={<RootRedirect />} />
 
-          <Route path="/" element={<RootRedirect />} />
+            {/* Child routes */}
+            <Route path="/" element={
+              <RoleRoute role="child">
+                <ChildLayout />
+              </RoleRoute>
+            }>
+              <Route path="today"        element={<Today />} />
+              <Route path="calendar"     element={<CalendarView />} />
+              <Route path="next-period"  element={<NextPeriod />} />
+              <Route path="settings"     element={<Settings />} />
+            </Route>
 
-          {/* Child routes */}
-          <Route path="/" element={
-            <RoleRoute role="child">
-              <ChildLayout />
-            </RoleRoute>
-          }>
-            <Route path="today"       element={<Today />} />
-            <Route path="calendar"    element={<CalendarView />} />
-            <Route path="next-period" element={<NextPeriod />} />
-            <Route path="settings"    element={<Settings />} />
-          </Route>
+            {/* Parent routes */}
+            <Route path="/parent" element={
+              <RoleRoute role="parent">
+                <ParentLayout />
+              </RoleRoute>
+            }>
+              <Route index element={<Navigate to="/parent/overview" replace />} />
+              <Route path="overview"  element={<Overview />} />
+              <Route path="calendar"  element={<ParentCalendar />} />
+              <Route path="account"   element={<ParentAccount />} />
+            </Route>
 
-          {/* Parent routes */}
-          <Route path="/parent" element={
-            <RoleRoute role="parent">
-              <Dashboard />
-            </RoleRoute>
-          } />
-
-          <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes>
+            <Route path="*" element={<Navigate to="/" replace />} />
+          </Routes>
+        </div>
       </BrowserRouter>
     </AuthProvider>
   )

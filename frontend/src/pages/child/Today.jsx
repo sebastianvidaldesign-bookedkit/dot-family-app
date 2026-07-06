@@ -1,12 +1,13 @@
 import { useState, useEffect } from 'react'
 import { format } from 'date-fns'
 import client from '../../api/client'
+import { CatSitting, PawPrint } from '../../components/Cat'
 
 const FLOWS = [
-  { value: 'light',    label: 'Light',    emoji: '🌸' },
-  { value: 'medium',   label: 'Medium',   emoji: '🌺' },
-  { value: 'heavy',    label: 'Heavy',    emoji: '🌹' },
-  { value: 'not_sure', label: 'Not sure', emoji: '?' },
+  { value: 'light',    label: 'Light',    hint: 'Just a little' },
+  { value: 'medium',   label: 'Medium',   hint: 'Regular day' },
+  { value: 'heavy',    label: 'Heavy',    hint: 'Heavier than usual' },
+  { value: 'not_sure', label: 'Not sure', hint: "That's okay too" },
 ]
 
 const SYMPTOMS = [
@@ -21,7 +22,7 @@ const today = format(new Date(), 'yyyy-MM-dd')
 
 export default function Today() {
   const [log, setLog]           = useState(null)
-  const [step, setStep]         = useState('ask') // ask | flow | symptoms | done
+  const [step, setStep]         = useState('ask')
   const [flow, setFlow]         = useState(null)
   const [symptoms, setSymptoms] = useState([])
   const [saving, setSaving]     = useState(false)
@@ -35,7 +36,7 @@ export default function Today() {
           setLog(todayLog)
           setFlow(todayLog.flow)
           setSymptoms(todayLog.symptoms || [])
-          setStep(todayLog.is_period_day ? 'done' : 'ask')
+          setStep(todayLog.is_period_day ? 'done' : 'not-today')
         }
       })
       .finally(() => setLoading(false))
@@ -63,92 +64,58 @@ export default function Today() {
     )
   }
 
-  const displayDate = format(new Date(), 'EEEE, MMMM d')
-
   if (loading) {
-    return <div className="flex items-center justify-center h-full"><Spinner /></div>
+    return (
+      <div className="flex items-center justify-center h-[60vh]">
+        <div className="w-8 h-8 border-[3px] border-dot-rose border-t-transparent rounded-full animate-spin" />
+      </div>
+    )
   }
 
   return (
-    <div className="px-6 pt-12 pb-6 flex flex-col min-h-full">
-      <p className="text-dot-muted text-sm font-medium mb-8">{displayDate}</p>
-
-      {step === 'ask' && (
-        <AskStep
-          onYes={() => setStep('flow')}
-          onNo={() => save(false, null, [])}
-          saving={saving}
-        />
-      )}
-
-      {step === 'flow' && (
-        <FlowStep
-          selected={flow}
-          onSelect={v => { setFlow(v); setStep('symptoms') }}
-          onBack={() => setStep('ask')}
-        />
-      )}
-
-      {step === 'symptoms' && (
-        <SymptomsStep
-          selected={symptoms}
-          onToggle={toggleSymptom}
-          onSave={() => save(true, flow, symptoms)}
-          onBack={() => setStep('flow')}
-          saving={saving}
-        />
-      )}
-
-      {step === 'done' && (
-        <DoneStep
-          log={log}
-          flow={flow}
-          symptoms={symptoms}
-          onEdit={() => setStep('flow')}
-          onNotToday={() => save(false, null, [])}
-          saving={saving}
-        />
-      )}
-
-      {step === 'not-today' && (
-        <div className="flex flex-col items-center justify-center flex-1 gap-4 text-center">
-          <div className="w-20 h-20 rounded-full bg-dot-sage-light flex items-center justify-center text-4xl">
-            ✓
-          </div>
-          <p className="text-xl font-semibold text-dot-text">Got it. Saved.</p>
-          <p className="text-dot-muted text-sm">Come back tomorrow.</p>
-          <button
-            onClick={() => setStep('ask')}
-            className="mt-4 text-sm text-dot-muted underline"
-          >
-            Actually, let me change that
-          </button>
-        </div>
-      )}
+    <div className="flex flex-col min-h-[calc(100dvh-64px)] px-5 pt-10 pb-6">
+      {step === 'ask'       && <AskStep onYes={() => setStep('flow')} onNo={() => save(false, null, [])} saving={saving} />}
+      {step === 'flow'      && <FlowStep selected={flow} onSelect={v => { setFlow(v); setStep('symptoms') }} onBack={() => setStep('ask')} />}
+      {step === 'symptoms'  && <SymptomsStep selected={symptoms} onToggle={toggleSymptom} onSave={() => save(true, flow, symptoms)} onBack={() => setStep('flow')} saving={saving} />}
+      {step === 'done'      && <DoneStep log={log} flow={flow} symptoms={symptoms} onEdit={() => setStep('flow')} onNotToday={() => save(false, null, [])} saving={saving} />}
+      {step === 'not-today' && <NotTodayStep onUndo={() => setStep('ask')} />}
     </div>
   )
 }
 
+/* ── Steps ── */
+
 function AskStep({ onYes, onNo, saving }) {
+  const displayDate = format(new Date(), 'EEEE, MMMM d')
+
   return (
     <div className="flex flex-col flex-1">
-      <h1 className="text-2xl font-semibold text-dot-text leading-snug mb-2">
-        Are you on your period today?
-      </h1>
-      <p className="text-dot-muted text-sm mb-12">No pressure either way.</p>
+      {/* Date + cat header */}
+      <div className="flex items-end justify-between mb-8">
+        <div>
+          <p className="text-xs font-semibold text-dot-muted uppercase tracking-widest mb-1">
+            {displayDate}
+          </p>
+          <h1 className="text-[28px] font-bold text-dot-text leading-tight">
+            Are you on your<br />period today?
+          </h1>
+        </div>
+        <CatSitting className="w-[72px] h-[72px] text-dot-rose flex-shrink-0 -mb-1" />
+      </div>
 
-      <div className="flex flex-col gap-4 mt-auto mb-4">
+      {/* Action buttons — pushed to bottom third */}
+      <div className="flex flex-col gap-3 mt-auto">
         <button
           onClick={onYes}
           disabled={saving}
-          className="w-full py-5 rounded-3xl bg-dot-rose text-white text-lg font-semibold active:opacity-80 disabled:opacity-60 transition-opacity"
+          className="w-full h-[64px] rounded-4xl bg-dot-rose text-white font-bold text-xl active:scale-[0.98] disabled:opacity-60 transition-all"
         >
           Yes
         </button>
         <button
           onClick={onNo}
           disabled={saving}
-          className="w-full py-5 rounded-3xl border-2 border-dot-border bg-white text-dot-text text-lg font-medium active:opacity-80 disabled:opacity-60 transition-opacity"
+          className="w-full h-[64px] rounded-4xl border-2 border-dot-border bg-dot-white text-dot-text font-semibold text-xl active:scale-[0.98] disabled:opacity-60 transition-all"
         >
           Not today
         </button>
@@ -160,22 +127,29 @@ function AskStep({ onYes, onNo, saving }) {
 function FlowStep({ selected, onSelect, onBack }) {
   return (
     <div className="flex flex-col flex-1">
-      <button onClick={onBack} className="text-dot-muted text-sm mb-8 self-start">← Back</button>
-      <h2 className="text-2xl font-semibold text-dot-text mb-2">How's the flow?</h2>
-      <p className="text-dot-muted text-sm mb-8">Pick whichever feels right.</p>
+      <BackButton onClick={onBack} />
+      <h2 className="text-2xl font-bold text-dot-text mt-4 mb-1">How's your flow?</h2>
+      <p className="text-sm font-medium text-dot-muted mb-7">Pick whatever feels right.</p>
 
       <div className="grid grid-cols-2 gap-3">
-        {FLOWS.map(({ value, label, emoji }) => (
+        {FLOWS.map(({ value, label, hint }) => (
           <button
             key={value}
             onClick={() => onSelect(value)}
-            className={`py-6 rounded-3xl flex flex-col items-center gap-2 text-base font-medium transition-colors border-2
+            className={`
+              flex flex-col items-center justify-center h-[88px] rounded-3xl border-2 gap-1
+              transition-all active:scale-[0.97]
               ${selected === value
-                ? 'bg-dot-rose-light border-dot-rose text-dot-rose'
-                : 'bg-white border-dot-border text-dot-text'}`}
+                ? 'bg-dot-rose-light border-dot-rose'
+                : 'bg-dot-white border-dot-border'}
+            `}
           >
-            <span className="text-2xl">{emoji}</span>
-            {label}
+            <span className={`text-base font-bold ${selected === value ? 'text-dot-rose' : 'text-dot-text'}`}>
+              {label}
+            </span>
+            <span className={`text-xs font-medium ${selected === value ? 'text-dot-rose-mid' : 'text-dot-muted'}`}>
+              {hint}
+            </span>
           </button>
         ))}
       </div>
@@ -186,19 +160,22 @@ function FlowStep({ selected, onSelect, onBack }) {
 function SymptomsStep({ selected, onToggle, onSave, onBack, saving }) {
   return (
     <div className="flex flex-col flex-1">
-      <button onClick={onBack} className="text-dot-muted text-sm mb-8 self-start">← Back</button>
-      <h2 className="text-2xl font-semibold text-dot-text mb-2">How are you feeling?</h2>
-      <p className="text-dot-muted text-sm mb-8">Tap everything that applies.</p>
+      <BackButton onClick={onBack} />
+      <h2 className="text-2xl font-bold text-dot-text mt-4 mb-1">How are you feeling?</h2>
+      <p className="text-sm font-medium text-dot-muted mb-7">Tap everything that applies.</p>
 
-      <div className="flex flex-wrap gap-3 mb-auto">
+      <div className="flex flex-wrap gap-2.5 mb-auto">
         {SYMPTOMS.map(({ value, label }) => (
           <button
             key={value}
             onClick={() => onToggle(value)}
-            className={`px-5 py-3 rounded-full text-sm font-medium border-2 transition-colors
+            className={`
+              h-[48px] px-5 rounded-full border-2 font-semibold text-sm
+              transition-all active:scale-[0.97]
               ${selected.includes(value)
                 ? 'bg-dot-rose-light border-dot-rose text-dot-rose'
-                : 'bg-white border-dot-border text-dot-text'}`}
+                : 'bg-dot-white border-dot-border text-dot-text'}
+            `}
           >
             {label}
           </button>
@@ -208,7 +185,7 @@ function SymptomsStep({ selected, onToggle, onSave, onBack, saving }) {
       <button
         onClick={onSave}
         disabled={saving}
-        className="w-full py-5 rounded-3xl bg-dot-rose text-white text-lg font-semibold mt-8 active:opacity-80 disabled:opacity-60 transition-opacity"
+        className="w-full h-[64px] rounded-4xl bg-dot-rose text-white font-bold text-xl mt-8 active:scale-[0.98] disabled:opacity-60 transition-all"
       >
         {saving ? 'Saving…' : 'Save'}
       </button>
@@ -217,43 +194,50 @@ function SymptomsStep({ selected, onToggle, onSave, onBack, saving }) {
 }
 
 function DoneStep({ log, flow, symptoms, onEdit, onNotToday, saving }) {
-  const flowLabel = FLOWS.find(f => f.value === flow)?.label
-  const symptomLabels = SYMPTOMS
-    .filter(s => symptoms.includes(s.value))
-    .map(s => s.label)
+  const flowLabel    = FLOWS.find(f => f.value === flow)?.label
+  const symptomLabels = SYMPTOMS.filter(s => symptoms.includes(s.value)).map(s => s.label)
 
   return (
     <div className="flex flex-col flex-1">
-      <div className="flex flex-col items-center pt-8 pb-6 gap-2">
-        <div className="w-24 h-24 rounded-full bg-dot-rose flex items-center justify-center mb-2">
-          <span className="text-white text-5xl font-bold">·</span>
+      {/* Confirmation header */}
+      <div className="flex flex-col items-center pt-10 pb-8 text-center">
+        <div className="w-16 h-16 rounded-full bg-dot-rose-light flex items-center justify-center mb-4">
+          <PawPrint className="w-8 h-8 text-dot-rose" />
         </div>
-        <p className="text-xl font-semibold text-dot-text">Logged for today</p>
-        {flowLabel && (
-          <p className="text-dot-muted text-sm">Flow: {flowLabel}</p>
-        )}
-        {symptomLabels.length > 0 && (
-          <div className="flex flex-wrap gap-2 justify-center mt-2">
-            {symptomLabels.map(s => (
-              <span key={s} className="px-3 py-1 rounded-full bg-dot-rose-light text-dot-rose text-xs font-medium">
-                {s}
-              </span>
-            ))}
-          </div>
-        )}
+        <h2 className="text-2xl font-bold text-dot-text">All set!</h2>
+        <p className="text-dot-muted text-sm font-medium mt-1.5">
+          Saved. You can change this any time.
+        </p>
       </div>
 
-      <div className="flex flex-col gap-3 mt-auto">
+      {/* Summary pill */}
+      <div className="bg-dot-rose-light rounded-3xl px-5 py-4 mb-2">
+        <p className="text-sm font-semibold text-dot-rose mb-2">Today's log</p>
+        <div className="flex items-center gap-2 flex-wrap">
+          {flowLabel && (
+            <span className="text-sm font-semibold text-dot-text bg-dot-white px-3 py-1 rounded-full">
+              {flowLabel} flow
+            </span>
+          )}
+          {symptomLabels.map(s => (
+            <span key={s} className="text-sm font-semibold text-dot-text bg-dot-white px-3 py-1 rounded-full">
+              {s}
+            </span>
+          ))}
+        </div>
+      </div>
+
+      <div className="flex flex-col gap-2 mt-auto">
         <button
           onClick={onEdit}
-          className="w-full py-4 rounded-3xl border-2 border-dot-border bg-white text-dot-text font-medium active:opacity-80 transition-opacity"
+          className="w-full h-[56px] rounded-4xl border-2 border-dot-border bg-dot-white text-dot-text font-semibold active:scale-[0.98] transition-all"
         >
           Edit today's entry
         </button>
         <button
           onClick={onNotToday}
           disabled={saving}
-          className="w-full py-4 rounded-3xl text-dot-muted text-sm active:opacity-80 disabled:opacity-60 transition-opacity"
+          className="w-full h-[44px] text-sm text-dot-muted font-semibold active:opacity-70 disabled:opacity-50 transition-opacity"
         >
           Actually, not today
         </button>
@@ -262,8 +246,36 @@ function DoneStep({ log, flow, symptoms, onEdit, onNotToday, saving }) {
   )
 }
 
-function Spinner() {
+function NotTodayStep({ onUndo }) {
   return (
-    <div className="w-8 h-8 border-2 border-dot-rose border-t-transparent rounded-full animate-spin" />
+    <div className="flex flex-col items-center justify-center flex-1 text-center gap-4">
+      <div className="w-16 h-16 rounded-full bg-dot-sage-light flex items-center justify-center text-3xl">
+        ✓
+      </div>
+      <div>
+        <p className="text-xl font-bold text-dot-text">Got it!</p>
+        <p className="text-sm font-medium text-dot-muted mt-1">Come back tomorrow.</p>
+      </div>
+      <button
+        onClick={onUndo}
+        className="text-sm font-semibold text-dot-muted underline underline-offset-2 mt-2"
+      >
+        Wait, actually it is
+      </button>
+    </div>
+  )
+}
+
+function BackButton({ onClick }) {
+  return (
+    <button
+      onClick={onClick}
+      className="flex items-center gap-1.5 text-sm font-semibold text-dot-muted active:opacity-70 self-start"
+    >
+      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2.5">
+        <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
+      </svg>
+      Back
+    </button>
   )
 }

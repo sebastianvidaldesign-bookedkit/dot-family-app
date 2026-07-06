@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { format, parseISO } from 'date-fns'
 import client from '../../api/client'
+import { CatSitting } from '../../components/Cat'
 
 export default function NextPeriod() {
   const [prediction, setPrediction] = useState(null)
@@ -13,70 +14,85 @@ export default function NextPeriod() {
   }, [])
 
   return (
-    <div className="px-6 pt-12 pb-6 flex flex-col min-h-full">
-      <h1 className="text-2xl font-semibold text-dot-text mb-1">Next period</h1>
-      <p className="text-dot-muted text-sm mb-10">A rough estimate, not a guarantee.</p>
+    <div className="px-5 pt-10 pb-8">
+      <h1 className="text-2xl font-bold text-dot-text mb-1">Next period</h1>
+      <p className="text-sm font-medium text-dot-muted mb-8">A rough guess, not a guarantee.</p>
 
       {loading && (
         <div className="flex justify-center mt-16">
-          <div className="w-8 h-8 border-2 border-dot-rose border-t-transparent rounded-full animate-spin" />
+          <div className="w-8 h-8 border-[3px] border-dot-rose border-t-transparent rounded-full animate-spin" />
         </div>
       )}
 
-      {!loading && prediction?.status === 'learning' && (
-        <LearningCard />
-      )}
-
-      {!loading && prediction?.status === 'predicted' && (
-        <PredictionCard prediction={prediction} />
-      )}
+      {!loading && prediction?.status === 'learning' && <LearningCard />}
+      {!loading && prediction?.status === 'predicted' && <PredictionCard prediction={prediction} />}
     </div>
   )
 }
 
 function LearningCard() {
   return (
-    <div className="bg-dot-surface rounded-3xl p-6 flex flex-col gap-4">
-      <div className="w-14 h-14 rounded-full bg-dot-rose-light flex items-center justify-center text-2xl">
-        🌱
+    <div className="flex flex-col gap-5">
+      <div className="bg-dot-surface rounded-4xl p-6 flex flex-col items-center text-center gap-4">
+        <CatSitting className="w-24 h-24 text-dot-rose" />
+        <div>
+          <p className="text-lg font-bold text-dot-text">Tiny reminder</p>
+          <p className="text-sm font-medium text-dot-muted mt-1.5 leading-relaxed max-w-[260px] mx-auto">
+            Your calendar is learning. After a couple of cycles, it'll give you a rough idea of what's coming.
+          </p>
+        </div>
       </div>
-      <h2 className="text-lg font-semibold text-dot-text">Still learning your cycle</h2>
-      <p className="text-dot-muted text-sm leading-relaxed">
-        After you've tracked a couple of cycles, this will give you a rough idea of when your next period might arrive.
-      </p>
-      <p className="text-dot-muted text-sm leading-relaxed">
-        Keep logging and it'll fill in over time.
-      </p>
+
+      <InfoCard
+        icon="📅"
+        title="Keep adding days"
+        body="Just log whether today is a period day. That's all it needs."
+      />
     </div>
   )
 }
 
 function PredictionCard({ prediction }) {
   const rangeStart = format(parseISO(prediction.range_start), 'MMM d')
-  const rangeEnd   = format(parseISO(prediction.range_end), 'MMM d')
+  const rangeEnd   = format(parseISO(prediction.range_end),   'MMM d')
   const lastStart  = format(parseISO(prediction.last_period_start), 'MMMM d')
 
   return (
-    <div className="flex flex-col gap-5">
-      <div className="bg-dot-surface rounded-3xl p-6">
-        <p className="text-sm text-dot-muted mb-3">Your next period might start around</p>
-        <p className="text-3xl font-semibold text-dot-rose">
+    <div className="flex flex-col gap-4">
+      {/* Main estimate card */}
+      <div className="bg-dot-rose-light rounded-4xl px-6 py-6">
+        <p className="text-xs font-bold text-dot-rose uppercase tracking-widest mb-3">Estimated next period</p>
+        <p className="text-[34px] font-bold text-dot-rose leading-none mb-1">
           {rangeStart} – {rangeEnd}
         </p>
-        <p className="text-xs text-dot-muted mt-3">
-          Based on an average cycle of about {prediction.avg_cycle_days} days.
+        <p className="text-sm font-medium text-dot-rose-mid mt-2">
+          About every {prediction.avg_cycle_days} days
         </p>
       </div>
 
-      <div className="bg-white rounded-3xl border border-dot-border p-5">
-        <p className="text-xs font-medium text-dot-muted mb-1">Last period started</p>
-        <p className="text-base font-semibold text-dot-text">{lastStart}</p>
+      {/* Last period */}
+      <div className="bg-dot-white rounded-3xl border border-dot-border px-5 py-4">
+        <p className="text-xs font-bold text-dot-muted uppercase tracking-wide mb-1">Last period started</p>
+        <p className="text-base font-bold text-dot-text">{lastStart}</p>
       </div>
 
-      <div className="bg-dot-sage-light rounded-3xl p-5">
-        <p className="text-sm text-dot-text leading-relaxed">
-          Cycles can be irregular, especially when you're younger. This is only a guess — your body knows its own timing.
+      {/* Gentle disclaimer */}
+      <div className="bg-dot-sage-light rounded-3xl px-5 py-4">
+        <p className="text-sm font-medium text-dot-text leading-relaxed">
+          Cycles can be irregular, especially at first. This is only a guess — your body knows its own timing.
         </p>
+      </div>
+    </div>
+  )
+}
+
+function InfoCard({ icon, title, body }) {
+  return (
+    <div className="bg-dot-white rounded-3xl border border-dot-border px-5 py-4 flex gap-4 items-start">
+      <span className="text-2xl flex-shrink-0 mt-0.5">{icon}</span>
+      <div>
+        <p className="text-sm font-bold text-dot-text">{title}</p>
+        <p className="text-sm font-medium text-dot-muted mt-1 leading-relaxed">{body}</p>
       </div>
     </div>
   )
