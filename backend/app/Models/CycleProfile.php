@@ -35,6 +35,11 @@ class CycleProfile extends Model
         return $this->hasMany(PeriodLog::class);
     }
 
+    public function periodRanges()
+    {
+        return $this->hasMany(PeriodRange::class);
+    }
+
     public function notes()
     {
         return $this->hasMany(Note::class);

@@ -12,19 +12,18 @@ class PredictionService
     private const ADOLESCENT_CENTER_DAYS = 32; // mean first-year interval
     private const ADOLESCENT_MAX_DAYS    = 45;
 
-    private const MIN_GAP             = 15;  // ignore gaps shorter than this (data error)
-    private const MAX_GAP             = 60;  // ignore gaps longer than this (data error)
-    private const LEARNED_RANGE_DAYS  = 3;   // ±3 day window for learned estimate
-    private const OVULATION_OFFSET    = 14;  // days before estimated next period
-    private const OVULATION_WINDOW    = 2;   // ±2 days around ovulation center
+    private const MIN_GAP            = 15;  // ignore gaps shorter than this (data error)
+    private const MAX_GAP            = 60;  // ignore gaps longer than this (data error)
+    private const LEARNED_RANGE_DAYS = 3;   // ±3 day window for learned estimate
+    private const OVULATION_OFFSET   = 14;  // days before estimated next period
+    private const OVULATION_WINDOW   = 2;   // ±2 days around ovulation center
 
     public function predict(CycleProfile $profile): array
     {
-        $starts = $profile->periodLogs()
-            ->where('is_period_day', true)
-            ->where('is_cycle_start', true)
-            ->orderBy('date')
-            ->pluck('date')
+        // Use period_ranges.start_date as the cycle start.
+        $starts = $profile->periodRanges()
+            ->orderBy('start_date')
+            ->pluck('start_date')
             ->map(fn ($d) => Carbon::parse($d))
             ->all();
 
@@ -33,7 +32,7 @@ class PredictionService
         if (count($starts) === 0) {
             return array_merge($summary, [
                 'status'                          => 'none',
-                'message'                         => 'Dot will learn as you add period days.',
+                'message'                         => 'Dot will learn as you add periods.',
                 'confidence_label'                => null,
                 'estimated_center_date'           => null,
                 'estimated_range_start'           => null,
@@ -65,7 +64,7 @@ class PredictionService
             ]);
         }
 
-        // 2+ starts — learn from average of valid first-day-to-first-day gaps.
+        // 2+ starts — learn from average of valid start-to-start gaps.
         $gaps = [];
         for ($i = 1; $i < count($starts); $i++) {
             $gap = $starts[$i - 1]->diffInDays($starts[$i]);
@@ -77,7 +76,7 @@ class PredictionService
         if (empty($gaps)) {
             return array_merge($summary, [
                 'status'                          => 'none',
-                'message'                         => 'Your calendar is still learning. Keep adding days.',
+                'message'                         => 'Your calendar is still learning. Keep adding periods.',
                 'confidence_label'                => null,
                 'estimated_center_date'           => null,
                 'estimated_range_start'           => null,
@@ -107,7 +106,6 @@ class PredictionService
         ]);
     }
 
-    // Build period summary from the most recent consecutive block of period days.
     private function buildSummary(CycleProfile $profile): array
     {
         $empty = [
@@ -115,60 +113,31 @@ class PredictionService
             'last_logged_period_day' => null,
             'duration_days'          => null,
             'period_start_source'    => 'none',
+            'period_ongoing'         => false,
         ];
 
-        $allLogs = $profile->periodLogs()
-            ->where('is_period_day', true)
-            ->orderBy('date')
-            ->get();
+        $latest = $profile->periodRanges()
+            ->orderBy('start_date', 'desc')
+            ->first();
 
-        if ($allLogs->isEmpty()) {
+        if (! $latest) {
             return $empty;
         }
 
-        // Group into consecutive blocks (gaps > 1 day split a block).
-        $blocks = [];
-        $block  = [];
+        $startDate = Carbon::parse($latest->start_date);
+        $endDate   = $latest->end_date ? Carbon::parse($latest->end_date) : null;
+        $ongoing   = $latest->end_date === null;
 
-        foreach ($allLogs as $log) {
-            $date = Carbon::parse($log->date);
-
-            if (empty($block)) {
-                $block[] = $log;
-            } else {
-                $prev = Carbon::parse(end($block)->date);
-                if ($date->diffInDays($prev) === 1) {
-                    $block[] = $log;
-                } else {
-                    $blocks[] = $block;
-                    $block    = [$log];
-                }
-            }
-        }
-
-        if (! empty($block)) {
-            $blocks[] = $block;
-        }
-
-        $lastBlock = end($blocks);
-
-        // Prefer the explicit is_cycle_start marker; fall back to the block's first day.
-        $startLog = collect($lastBlock)->firstWhere('is_cycle_start', true);
-        $source   = $startLog ? 'explicit' : 'inferred';
-
-        if (! $startLog) {
-            $startLog = $lastBlock[0];
-        }
-
-        $startDate    = Carbon::parse($startLog->date);
-        $lastDate     = Carbon::parse(end($lastBlock)->date);
-        $durationDays = (int) $startDate->diffInDays($lastDate) + 1;
+        // Duration from start to end (inclusive); if ongoing, count to today.
+        $durationEnd  = $endDate ?? now()->startOfDay();
+        $durationDays = (int) $startDate->diffInDays($durationEnd) + 1;
 
         return [
             'last_period_start'      => $startDate->format('Y-m-d'),
-            'last_logged_period_day' => $lastDate->format('Y-m-d'),
+            'last_logged_period_day' => $endDate ? $endDate->format('Y-m-d') : null,
             'duration_days'          => $durationDays,
-            'period_start_source'    => $source,
+            'period_start_source'    => 'explicit',
+            'period_ongoing'         => $ongoing,
         ];
     }
 }

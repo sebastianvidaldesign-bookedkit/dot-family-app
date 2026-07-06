@@ -93,31 +93,28 @@ function SharedState({ prediction }) {
 }
 
 function PeriodSummaryCard({ prediction }) {
-  const started    = format(parseISO(prediction.last_period_start),      'MMM d')
-  const lastLogged = format(parseISO(prediction.last_logged_period_day), 'MMM d')
-  const same       = prediction.last_period_start === prediction.last_logged_period_day
-  const days       = prediction.duration_days
-  const isInferred = prediction.period_start_source === 'inferred'
-  const isLong     = days > 7
+  const ongoing  = !!prediction.period_ongoing
+  const started  = format(parseISO(prediction.last_period_start), 'MMM d')
+  const ended    = prediction.last_logged_period_day
+    ? format(parseISO(prediction.last_logged_period_day), 'MMM d')
+    : null
+  const sameDay  = !ongoing && prediction.last_period_start === prediction.last_logged_period_day
+  const days     = prediction.duration_days
+  const isLong   = !ongoing && days > 7
 
   return (
     <div className="bg-dot-white rounded-3xl border border-dot-border px-5 py-4">
-      <Label>Last period</Label>
+      <Label>{ongoing ? 'Current period' : 'Last period'}</Label>
 
       <div className="flex flex-col gap-1.5 mt-3">
-        <Row label="Started"          value={started} />
-        {!same && <Row label="Last logged day" value={lastLogged} />}
+        <Row label="Started" value={started} />
+        {ongoing && <Row label="Status" value="Still going" />}
+        {!ongoing && !sameDay && ended && <Row label="Ended" value={ended} />}
         <Row
-          label={same ? 'Duration so far' : 'Duration'}
+          label={ongoing ? 'Duration so far' : 'Duration'}
           value={days === 1 ? '1 day' : `${days} days`}
         />
       </div>
-
-      {isInferred && (
-        <p className="text-xs text-dot-muted mt-3 leading-relaxed">
-          Mark the first day in the Calendar to improve estimates.
-        </p>
-      )}
 
       {isLong && (
         <p className="text-xs text-dot-muted mt-3 leading-relaxed">

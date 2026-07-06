@@ -6,6 +6,7 @@ use App\Http\Controllers\FamilyCalendarController;
 use App\Http\Controllers\NoteController;
 use App\Http\Controllers\ParentDashboardController;
 use App\Http\Controllers\PeriodLogController;
+use App\Http\Controllers\PeriodRangeController;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Route;
 
@@ -55,10 +56,18 @@ Route::middleware('auth:sanctum')->group(function () {
     // Family calendar — shared by child, dad, and mom
     // All three read/write the child's single cycle_profile via family membership
     Route::prefix('family')->group(function () {
-        Route::get('calendar',          [FamilyCalendarController::class, 'index']);
-        Route::post('calendar',         [FamilyCalendarController::class, 'upsert']);
+        // Period range endpoints (new model)
+        Route::get('ranges',           [PeriodRangeController::class, 'index']);
+        Route::post('ranges',          [PeriodRangeController::class, 'upsert']);
+        Route::delete('ranges/{id}',   [PeriodRangeController::class, 'destroy']);
+
+        // Prediction (unchanged API surface)
+        Route::get('prediction',       [FamilyCalendarController::class, 'prediction']);
+
+        // Legacy individual-day endpoints kept for backward compat
+        Route::get('calendar',         [FamilyCalendarController::class, 'index']);
+        Route::post('calendar',        [FamilyCalendarController::class, 'upsert']);
         Route::delete('calendar/{date}',[FamilyCalendarController::class, 'destroy']);
-        Route::get('prediction',        [FamilyCalendarController::class, 'prediction']);
     });
 
     // Parent-only routes
