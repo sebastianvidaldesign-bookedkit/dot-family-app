@@ -56,6 +56,7 @@ class FamilyCalendarController extends Controller
     {
         $data = $request->validate([
             'date'           => 'required|date_format:Y-m-d',
+            'new_date'       => 'sometimes|date_format:Y-m-d|different:date',
             'is_period_day'  => 'required|boolean',
             'is_cycle_start' => 'sometimes|boolean',
             'flow'           => 'nullable|in:light,medium,heavy,not_sure',
@@ -70,29 +71,53 @@ class FamilyCalendarController extends Controller
             return response()->json(['message' => 'No family calendar found.'], 404);
         }
 
-        // is_cycle_start only makes sense when is_period_day is true.
         $isCycleStart = $data['is_period_day']
             ? (bool) ($data['is_cycle_start'] ?? false)
             : false;
 
-        $existing = $profile->periodLogs()->where('date', $data['date'])->first();
+        $isDateChange = isset($data['new_date']);
+        $targetDate   = $data['new_date'] ?? $data['date'];
 
-        if ($existing) {
-            $existing->is_period_day      = $data['is_period_day'];
-            $existing->is_cycle_start     = $isCycleStart;
-            $existing->flow               = $data['is_period_day'] ? ($data['flow'] ?? null) : null;
-            $existing->updated_by_user_id = $user->id;
-            $existing->save();
-            $log = $existing;
+        if ($isDateChange) {
+            // Find the source log — must belong to this profile.
+            $log = $profile->periodLogs()->where('date', $data['date'])->first();
+            if (! $log) {
+                return response()->json(['message' => 'Entry not found.'], 404);
+            }
+
+            // If something already lives at the target date, remove it (frontend confirmed).
+            $conflict = $profile->periodLogs()->where('date', $targetDate)->first();
+            if ($conflict && $conflict->id !== $log->id) {
+                $conflict->symptoms()->delete();
+                $conflict->delete();
+            }
+
+            $log->date               = $targetDate;
+            $log->is_period_day      = $data['is_period_day'];
+            $log->is_cycle_start     = $isCycleStart;
+            $log->flow               = $data['is_period_day'] ? ($data['flow'] ?? null) : null;
+            $log->updated_by_user_id = $user->id;
+            $log->save();
         } else {
-            $log = $profile->periodLogs()->create([
-                'date'               => $data['date'],
-                'is_period_day'      => $data['is_period_day'],
-                'is_cycle_start'     => $isCycleStart,
-                'flow'               => $data['is_period_day'] ? ($data['flow'] ?? null) : null,
-                'created_by_user_id' => $user->id,
-                'updated_by_user_id' => $user->id,
-            ]);
+            $existing = $profile->periodLogs()->where('date', $data['date'])->first();
+
+            if ($existing) {
+                $existing->is_period_day      = $data['is_period_day'];
+                $existing->is_cycle_start     = $isCycleStart;
+                $existing->flow               = $data['is_period_day'] ? ($data['flow'] ?? null) : null;
+                $existing->updated_by_user_id = $user->id;
+                $existing->save();
+                $log = $existing;
+            } else {
+                $log = $profile->periodLogs()->create([
+                    'date'               => $data['date'],
+                    'is_period_day'      => $data['is_period_day'],
+                    'is_cycle_start'     => $isCycleStart,
+                    'flow'               => $data['is_period_day'] ? ($data['flow'] ?? null) : null,
+                    'created_by_user_id' => $user->id,
+                    'updated_by_user_id' => $user->id,
+                ]);
+            }
         }
 
         if (array_key_exists('symptoms', $data)) {
@@ -105,6 +130,31 @@ class FamilyCalendarController extends Controller
         $log->load('symptoms', 'updatedBy', 'createdBy');
 
         return response()->json($this->formatLog($log, $user));
+    }
+
+    public function destroy(Request $request, string $date)
+    {
+        if (! preg_match('/^\d{4}-\d{2}-\d{2}$/', $date)) {
+            return response()->json(['message' => 'Invalid date format.'], 422);
+        }
+
+        $user    = $request->user();
+        $profile = $this->resolveProfile($user);
+
+        if (! $profile) {
+            return response()->json(['message' => 'No family calendar found.'], 404);
+        }
+
+        $log = $profile->periodLogs()->where('date', $date)->first();
+
+        if (! $log) {
+            return response()->json(['message' => 'Entry not found.'], 404);
+        }
+
+        $log->symptoms()->delete();
+        $log->delete();
+
+        return response()->json(['ok' => true]);
     }
 
     public function prediction(Request $request)

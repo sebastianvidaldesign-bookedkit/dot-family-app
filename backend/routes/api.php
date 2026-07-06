@@ -55,9 +55,10 @@ Route::middleware('auth:sanctum')->group(function () {
     // Family calendar — shared by child, dad, and mom
     // All three read/write the child's single cycle_profile via family membership
     Route::prefix('family')->group(function () {
-        Route::get('calendar',   [FamilyCalendarController::class, 'index']);
-        Route::post('calendar',  [FamilyCalendarController::class, 'upsert']);
-        Route::get('prediction', [FamilyCalendarController::class, 'prediction']);
+        Route::get('calendar',          [FamilyCalendarController::class, 'index']);
+        Route::post('calendar',         [FamilyCalendarController::class, 'upsert']);
+        Route::delete('calendar/{date}',[FamilyCalendarController::class, 'destroy']);
+        Route::get('prediction',        [FamilyCalendarController::class, 'prediction']);
     });
 
     // Parent-only routes
