@@ -20,7 +20,7 @@ export default function Overview() {
   return (
     <div className="px-5 pt-10 pb-8">
       <h1 className="text-2xl font-bold text-dot-text mb-1">Hi, {user?.name}</h1>
-      <p className="text-sm font-medium text-dot-muted mb-8">Family overview</p>
+      <p className="text-sm font-medium text-dot-muted mb-8">Shared family calendar</p>
 
       {loading && (
         <div className="flex justify-center mt-16">
@@ -34,106 +34,170 @@ export default function Overview() {
         </div>
       )}
 
-      {!loading && !error && data?.shared === false && (
-        <NotSharedState />
-      )}
+      {!loading && !error && data?.shared === false && <NoDataState />}
 
-      {!loading && !error && data?.shared === true && (
-        <SharedState data={data} />
-      )}
+      {!loading && !error && data?.shared === true && <SharedState prediction={data.prediction} />}
     </div>
   )
 }
 
-function NotSharedState() {
+function NoDataState() {
   return (
     <div className="bg-dot-surface rounded-4xl p-6 flex flex-col items-center text-center gap-4">
       <CatPeeking className="w-20 h-12 text-dot-rose" />
       <div>
-        <p className="text-lg font-bold text-dot-text">No data yet</p>
+        <p className="text-lg font-bold text-dot-text">No entries yet</p>
         <p className="text-sm font-medium text-dot-muted mt-1.5 leading-relaxed max-w-[240px] mx-auto">
-          Add the first period day from the Calendar tab.
+          Add a period day from the Calendar tab, and Dot will start learning.
         </p>
       </div>
     </div>
   )
 }
 
-function SharedState({ data }) {
-  const { period_summary: ps, prediction } = data
-  // share_level field removed — parents always see full data
+function SharedState({ prediction }) {
+  const hasPeriodData = !!prediction?.last_period_start
+  const hasEstimate   = prediction?.status === 'first_guess' || prediction?.status === 'learned'
+  const hasOvulation  = hasEstimate && prediction?.possible_ovulation_window_start
 
   return (
     <div className="flex flex-col gap-4">
-      {/* Period range summary */}
-      {ps ? (
-        <PeriodSummaryCard summary={ps} />
+
+      {/* Last period summary */}
+      {hasPeriodData ? (
+        <PeriodSummaryCard prediction={prediction} />
       ) : (
-        <SummaryCard
-          label="Last period"
-          value="No entries yet"
-          muted
-        />
+        <Card>
+          <Label>Last period</Label>
+          <p className="text-base font-bold text-dot-muted">No entries yet</p>
+        </Card>
       )}
 
-      {/* Prediction */}
-      {(prediction?.status === 'fallback' || prediction?.status === 'learned') && (
-        <div className="bg-dot-rose-light rounded-4xl px-6 py-5">
-          <div className="flex items-center gap-2 mb-2">
-            <p className="text-xs font-bold text-dot-rose uppercase tracking-widest">Might start around</p>
-            {prediction.confidence_label && (
-              <span className="text-xs font-bold text-dot-rose-mid bg-dot-white px-2 py-0.5 rounded-full capitalize">
-                {prediction.confidence_label}
-              </span>
-            )}
-          </div>
-          <p className="text-2xl font-bold text-dot-rose">
-            {format(parseISO(prediction.range_start), 'MMM d')} – {format(parseISO(prediction.range_end), 'MMM d')}
-          </p>
-          <p className="text-xs font-medium text-dot-rose-mid mt-2">
-            {prediction.status === 'fallback'
-              ? 'First guess — Dot will learn over time.'
-              : 'Dot is learning your cycle.'}
-          </p>
-        </div>
-      )}
+      {/* Next period estimate */}
+      {hasEstimate && <NextEstimateCard prediction={prediction} />}
 
       {prediction?.status === 'none' && (
-        <SummaryCard
-          label="Estimated next period"
-          value="Dot will learn as more days are added"
-          muted
-        />
+        <Card>
+          <Label>Next period</Label>
+          <p className="text-sm font-medium text-dot-muted leading-relaxed">
+            Dot will learn as you add period days.
+          </p>
+        </Card>
       )}
+
+      {/* Possible ovulation window — subtle, secondary */}
+      {hasOvulation && <OvulationCard prediction={prediction} />}
 
     </div>
   )
 }
 
-function PeriodSummaryCard({ summary }) {
-  const started    = format(parseISO(summary.started),        'MMM d')
-  const lastLogged = format(parseISO(summary.last_logged_day), 'MMM d')
-  const same       = summary.started === summary.last_logged_day
+function PeriodSummaryCard({ prediction }) {
+  const started    = format(parseISO(prediction.last_period_start),      'MMM d')
+  const lastLogged = format(parseISO(prediction.last_logged_period_day), 'MMM d')
+  const same       = prediction.last_period_start === prediction.last_logged_period_day
+  const days       = prediction.duration_days
+  const isInferred = prediction.period_start_source === 'inferred'
+  const isLong     = days > 7
 
   return (
     <div className="bg-dot-white rounded-3xl border border-dot-border px-5 py-4">
-      <p className="text-xs font-bold text-dot-muted uppercase tracking-wide mb-3">Last period</p>
+      <Label>Last period</Label>
 
-      <div className="flex flex-col gap-1.5">
-        <Row label="Started" value={started} />
+      <div className="flex flex-col gap-1.5 mt-3">
+        <Row label="Started"          value={started} />
         {!same && <Row label="Last logged day" value={lastLogged} />}
         <Row
           label={same ? 'Duration so far' : 'Duration'}
-          value={summary.duration_days === 1 ? '1 day' : `${summary.duration_days} days`}
+          value={days === 1 ? '1 day' : `${days} days`}
         />
       </div>
 
-      {!summary.has_cycle_start_marker && (
+      {isInferred && (
         <p className="text-xs text-dot-muted mt-3 leading-relaxed">
           Mark the first day in the Calendar to improve estimates.
         </p>
       )}
+
+      {isLong && (
+        <p className="text-xs text-dot-muted mt-3 leading-relaxed">
+          Periods often last 2–7 days. If bleeding feels heavy or lasts longer than usual, check with a trusted adult or doctor.
+        </p>
+      )}
     </div>
+  )
+}
+
+function NextEstimateCard({ prediction }) {
+  const center     = format(parseISO(prediction.estimated_center_date), 'MMM d')
+  const rangeStart = format(parseISO(prediction.estimated_range_start), 'MMM d')
+  const rangeEnd   = format(parseISO(prediction.estimated_range_end),   'MMM d')
+  const isFirst    = prediction.status === 'first_guess'
+
+  return (
+    <div className="bg-dot-rose-light rounded-4xl px-6 py-5">
+      <div className="flex items-center gap-2 mb-3">
+        <Label rose>Next period</Label>
+        {prediction.confidence_label && (
+          <span className="text-xs font-bold text-dot-rose-mid bg-dot-white px-2 py-0.5 rounded-full capitalize">
+            {prediction.confidence_label}
+          </span>
+        )}
+      </div>
+
+      <p className="text-xs font-semibold text-dot-rose-mid mb-0.5 uppercase tracking-wide">
+        Might start around
+      </p>
+      <p className="text-2xl font-bold text-dot-rose mb-1">{center}</p>
+
+      {isFirst ? (
+        <p className="text-xs font-medium text-dot-rose-mid">
+          A normal early cycle can vary a lot — roughly {rangeStart} to {rangeEnd}.
+        </p>
+      ) : (
+        <p className="text-xs font-medium text-dot-rose-mid">
+          Possible range: {rangeStart} – {rangeEnd}
+          {prediction.average_cycle_days ? ` · About every ${prediction.average_cycle_days} days` : ''}
+        </p>
+      )}
+
+      <p className="text-xs font-medium text-dot-rose-mid mt-2">
+        {prediction.message}
+      </p>
+    </div>
+  )
+}
+
+function OvulationCard({ prediction }) {
+  const start = format(parseISO(prediction.possible_ovulation_window_start), 'MMM d')
+  const end   = format(parseISO(prediction.possible_ovulation_window_end),   'MMM d')
+
+  return (
+    <div className="bg-dot-surface rounded-3xl px-5 py-4 border border-dot-border">
+      <Label>Possible cycle phase</Label>
+      <p className="text-sm font-bold text-dot-text mt-2">Around {start} – {end}</p>
+      <p className="text-xs font-medium text-dot-muted mt-1 leading-relaxed">
+        Very rough estimate. Dot is still learning.
+      </p>
+    </div>
+  )
+}
+
+// ── Shared primitives ──────────────────────────────────────────────────────────
+
+function Card({ children }) {
+  return (
+    <div className="bg-dot-white rounded-3xl border border-dot-border px-5 py-4">
+      {children}
+    </div>
+  )
+}
+
+function Label({ children, rose }) {
+  return (
+    <p className={`text-xs font-bold uppercase tracking-wide mb-1 ${rose ? 'text-dot-rose' : 'text-dot-muted'}`}>
+      {children}
+    </p>
   )
 }
 
@@ -145,13 +209,3 @@ function Row({ label, value }) {
     </div>
   )
 }
-
-function SummaryCard({ label, value, muted }) {
-  return (
-    <div className="bg-dot-white rounded-3xl border border-dot-border px-5 py-4">
-      <p className="text-xs font-bold text-dot-muted uppercase tracking-wide mb-1">{label}</p>
-      <p className={`text-base font-bold ${muted ? 'text-dot-muted' : 'text-dot-text'}`}>{value}</p>
-    </div>
-  )
-}
-

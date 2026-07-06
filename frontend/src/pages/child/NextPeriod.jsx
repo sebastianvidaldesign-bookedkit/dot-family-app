@@ -24,9 +24,9 @@ export default function NextPeriod() {
         </div>
       )}
 
-      {!loading && prediction?.status === 'none'     && <LearningCard />}
-      {!loading && prediction?.status === 'fallback' && <PredictionCard prediction={prediction} />}
-      {!loading && prediction?.status === 'learned'  && <PredictionCard prediction={prediction} />}
+      {!loading && prediction?.status === 'none'        && <LearningCard />}
+      {!loading && prediction?.status === 'first_guess' && <EstimateCard prediction={prediction} />}
+      {!loading && prediction?.status === 'learned'     && <EstimateCard prediction={prediction} />}
     </div>
   )
 }
@@ -37,9 +37,9 @@ function LearningCard() {
       <div className="bg-dot-surface rounded-4xl p-6 flex flex-col items-center text-center gap-4">
         <CatSitting className="w-24 h-24 text-dot-rose" />
         <div>
-          <p className="text-lg font-bold text-dot-text">Tiny reminder</p>
+          <p className="text-lg font-bold text-dot-text">Dot is still learning</p>
           <p className="text-sm font-medium text-dot-muted mt-1.5 leading-relaxed max-w-[260px] mx-auto">
-            Your calendar will learn as you add days.
+            Dot will learn as you add period days.
           </p>
         </div>
       </div>
@@ -47,21 +47,22 @@ function LearningCard() {
       <InfoCard
         icon="📅"
         title="Keep adding days"
-        body="Just log whether today is a period day. That's all it needs."
+        body="Just log whether today is a period day, and mark the first day when your period starts."
       />
     </div>
   )
 }
 
-function PredictionCard({ prediction }) {
-  const rangeStart = format(parseISO(prediction.range_start), 'MMM d')
-  const rangeEnd   = format(parseISO(prediction.range_end),   'MMM d')
-  const lastStart  = format(parseISO(prediction.last_period_start), 'MMMM d')
-  const isFallback = prediction.status === 'fallback'
+function EstimateCard({ prediction }) {
+  const center     = format(parseISO(prediction.estimated_center_date), 'MMM d')
+  const rangeStart = format(parseISO(prediction.estimated_range_start), 'MMM d')
+  const rangeEnd   = format(parseISO(prediction.estimated_range_end),   'MMM d')
+  const isFirst    = prediction.status === 'first_guess'
+  const hasOv      = !!prediction.possible_ovulation_window_start
 
   return (
     <div className="flex flex-col gap-4">
-      {/* Main estimate card */}
+      {/* Main estimate */}
       <div className="bg-dot-rose-light rounded-4xl px-6 py-6">
         <div className="flex items-center gap-2 mb-3">
           <p className="text-xs font-bold text-dot-rose uppercase tracking-widest">
@@ -73,29 +74,56 @@ function PredictionCard({ prediction }) {
             </span>
           )}
         </div>
-        <p className="text-[34px] font-bold text-dot-rose leading-none mb-1">
-          {rangeStart} – {rangeEnd}
-        </p>
-        {!isFallback && (
-          <p className="text-sm font-medium text-dot-rose-mid mt-2">
-            About every {prediction.avg_cycle_days} days
+
+        <p className="text-[34px] font-bold text-dot-rose leading-none mb-2">{center}</p>
+
+        {isFirst ? (
+          <p className="text-sm font-medium text-dot-rose-mid">
+            A normal early cycle can vary a lot — roughly {rangeStart} to {rangeEnd}.
+          </p>
+        ) : (
+          <p className="text-sm font-medium text-dot-rose-mid">
+            Possible range: {rangeStart} – {rangeEnd}
+            {prediction.average_cycle_days ? ` · About every ${prediction.average_cycle_days} days` : ''}
           </p>
         )}
       </div>
 
-      {/* Last period */}
-      <div className="bg-dot-white rounded-3xl border border-dot-border px-5 py-4">
-        <p className="text-xs font-bold text-dot-muted uppercase tracking-wide mb-1">Last period started</p>
-        <p className="text-base font-bold text-dot-text">{lastStart}</p>
-      </div>
+      {/* Last period started */}
+      {prediction.last_period_start && (
+        <div className="bg-dot-white rounded-3xl border border-dot-border px-5 py-4">
+          <p className="text-xs font-bold text-dot-muted uppercase tracking-wide mb-1">Last period started</p>
+          <p className="text-base font-bold text-dot-text">
+            {format(parseISO(prediction.last_period_start), 'MMMM d')}
+          </p>
+          {prediction.duration_days && (
+            <p className="text-xs font-medium text-dot-muted mt-1">
+              {prediction.duration_days === 1
+                ? '1 day logged'
+                : `${prediction.duration_days} days logged`}
+            </p>
+          )}
+        </div>
+      )}
 
-      {/* Calm disclaimer */}
+      {/* Disclaimer */}
       <div className="bg-dot-sage-light rounded-3xl px-5 py-4">
         <p className="text-sm font-medium text-dot-text leading-relaxed">
-          {prediction.message}
-          {' '}Dot will learn over time.
+          {prediction.message} Dot will learn over time.
         </p>
       </div>
+
+      {/* Possible cycle phase — very light, child-facing */}
+      {hasOv && (
+        <div className="px-1">
+          <p className="text-xs font-medium text-dot-muted text-center leading-relaxed">
+            Possible cycle phase around{' '}
+            {format(parseISO(prediction.possible_ovulation_window_start), 'MMM d')}–
+            {format(parseISO(prediction.possible_ovulation_window_end),   'MMM d')}.{' '}
+            Very rough estimate.
+          </p>
+        </div>
+      )}
     </div>
   )
 }

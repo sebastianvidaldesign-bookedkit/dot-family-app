@@ -26,7 +26,7 @@ const SYMPTOM_LABEL = Object.fromEntries(SYMPTOMS.map(s => [s.value, s.label]))
 
 const todayKey = format(new Date(), 'yyyy-MM-dd')
 
-const HAS_RANGE = new Set(['fallback', 'learned'])
+const HAS_RANGE = new Set(['first_guess', 'learned'])
 
 export default function FamilyCalendar() {
   const [current, setCurrent]       = useState(new Date())
@@ -45,6 +45,7 @@ export default function FamilyCalendar() {
     client.get('/family/prediction').then(({ data }) => {
       setPrediction(data)
       if (HAS_RANGE.has(data.status) || data.last_period_start) setHasAnyData(true)
+
     })
   }, [monthKey])
 
@@ -57,7 +58,12 @@ export default function FamilyCalendar() {
   function isPredicted(date) {
     if (!prediction || !HAS_RANGE.has(prediction.status)) return false
     const d = format(date, 'yyyy-MM-dd')
-    return d >= prediction.range_start && d <= prediction.range_end
+    // For first_guess the range is 21–45 days wide — only mark the center day
+    // so the calendar doesn't fill up with dashed circles.
+    if (prediction.status === 'first_guess') {
+      return d === prediction.estimated_center_date
+    }
+    return d >= prediction.estimated_range_start && d <= prediction.estimated_range_end
   }
 
   const calDays = eachDayOfInterval({
