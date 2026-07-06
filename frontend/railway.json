@@ -4,7 +4,7 @@
     "builder": "NIXPACKS"
   },
   "deploy": {
-    "startCommand": "npx serve dist -l $PORT",
+    "startCommand": "npx serve dist -s -l $PORT",
     "buildCommand": "npm install && npm run build"
   }
 }
