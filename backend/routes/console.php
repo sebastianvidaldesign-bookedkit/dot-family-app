@@ -2,8 +2,6 @@
 
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Support\Facades\Artisan;
-use App\Models\User;
-use App\Models\CycleProfile;
 
 Artisan::command('inspire', function () {
     $this->comment(Inspiring::quote());

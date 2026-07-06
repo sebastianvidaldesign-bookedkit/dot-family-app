@@ -13,7 +13,6 @@ class DatabaseSeeder extends Seeder
 {
     public function run(): void
     {
-        // Create users
         $child = User::create([
             'name'     => 'Child',
             'email'    => 'child@dot.family',
@@ -35,22 +34,20 @@ class DatabaseSeeder extends Seeder
             'role'     => 'parent',
         ]);
 
-        // Create family
         $family = Family::create(['name' => 'Our Family']);
 
-        // Attach members (parent order matters: index 0 = parent_1, index 1 = parent_2)
+        // Parent order matters: index 0 = parent_1, index 1 = parent_2
         FamilyMember::create(['family_id' => $family->id, 'user_id' => $child->id, 'role' => 'child']);
         FamilyMember::create(['family_id' => $family->id, 'user_id' => $dad->id,   'role' => 'parent']);
         FamilyMember::create(['family_id' => $family->id, 'user_id' => $mom->id,   'role' => 'parent']);
 
-        // Create cycle profile (sharing off by default)
         CycleProfile::create([
-            'owner_user_id'       => $child->id,
-            'family_id'           => $family->id,
-            'average_cycle_length'=> 28,
-            'share_level'         => 'basic',
-            'share_with_parent_1' => false,
-            'share_with_parent_2' => false,
+            'owner_user_id'        => $child->id,
+            'family_id'            => $family->id,
+            'average_cycle_length' => 28,
+            'share_level'          => 'basic',
+            'share_with_parent_1'  => false,
+            'share_with_parent_2'  => false,
         ]);
 
         $this->command->info('');
@@ -63,7 +60,6 @@ class DatabaseSeeder extends Seeder
                 ['Mom',   'mom@dot.family',   'password'],
             ]
         );
-        $this->command->info('');
         $this->command->warn('Change all passwords before deploying to production.');
     }
 }

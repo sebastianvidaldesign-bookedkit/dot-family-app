@@ -12,7 +12,7 @@ Three accounts: one child, two parents. The child owns their data. Parents see o
 
 ```
 dot-family-app/
-├── backend/    Laravel 11 API (Sanctum token auth)
+├── backend/    Laravel API (Sanctum token auth) — complete app, no scaffolding needed
 └── frontend/   React + Vite (Tailwind CSS)
 ```
 
@@ -22,7 +22,7 @@ dot-family-app/
 
 ### Requirements
 
-- PHP 8.2+
+- PHP 8.3+
 - Composer
 - Node 18+
 - MySQL 8+ (or PostgreSQL)
@@ -36,21 +36,17 @@ cd dot-family-app
 
 ### 2. Backend
 
+`backend/` is a complete Laravel app. No scaffolding required.
+
 ```bash
 cd backend
 
-# Install Laravel and create fresh project in this directory
-composer create-project laravel/laravel . --prefer-dist
-
-# Install Sanctum
-composer require laravel/sanctum
-
-# Copy custom app files (already in repo — they overwrite defaults)
-# Nothing to copy; the files are already in backend/
+# Install dependencies
+composer install
 
 # Configure environment
 cp .env.example .env
-# Edit .env: set DB_DATABASE, DB_USERNAME, DB_PASSWORD, APP_KEY
+# Edit .env: set DB_DATABASE, DB_USERNAME, DB_PASSWORD
 
 # Generate app key
 php artisan key:generate

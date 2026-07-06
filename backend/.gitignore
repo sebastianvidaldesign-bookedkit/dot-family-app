@@ -11,7 +11,8 @@
 /storage/framework/sessions
 /storage/framework/testing
 /storage/framework/views
-/storage/logs
+/storage/logs/*.log
 bootstrap/cache/*.php
 public/hot
 public/storage
+database/database.sqlite
