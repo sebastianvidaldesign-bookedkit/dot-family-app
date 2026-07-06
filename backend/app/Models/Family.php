@@ -25,11 +25,11 @@ class Family extends Model
 
     public function childUser(): ?User
     {
-        return $this->users()->where('role', 'child')->first();
+        return $this->users()->where('users.role', 'child')->first();
     }
 
     public function parentUsers()
     {
-        return $this->users()->where('role', 'parent')->get();
+        return $this->users()->where('users.role', 'parent')->get();
     }
 }
