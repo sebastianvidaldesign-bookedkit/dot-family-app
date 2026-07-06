@@ -19,6 +19,7 @@ Artisan::command('dot:delete-all-data', function () {
     \App\Models\CycleProfile::query()->delete();
     \App\Models\FamilyMember::query()->delete();
     \App\Models\Family::query()->delete();
+    \Laravel\Sanctum\PersonalAccessToken::query()->delete();
     \App\Models\User::query()->delete();
 
     $this->info('All data permanently deleted.');

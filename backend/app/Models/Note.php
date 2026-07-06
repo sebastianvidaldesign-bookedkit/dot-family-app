@@ -10,6 +10,7 @@ class Note extends Model
 
     protected $casts = [
         'date' => 'date:Y-m-d',
+        'body' => 'encrypted',
     ];
 
     public function cycleProfile()

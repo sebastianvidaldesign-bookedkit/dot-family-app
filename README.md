@@ -198,24 +198,110 @@ In each service's Settings → Domains, add a custom domain or use the generated
 
 ---
 
-## Privacy notes
+## Security and privacy
 
-- No Google Analytics, Meta Pixel, PostHog, or any third-party tracking.
-- Health data is not logged to stdout or server logs.
-- Period details are never included in any email.
-- Passwords are bcrypt-hashed.
+### Threat model
+
+Dot is a private family app with three known users. The security goal is to protect one child's sensitive health data from anyone outside the family, and from parents who have not been explicitly granted access by the child.
+
+### Privacy guarantees
+
+- No Google Analytics, Meta Pixel, PostHog, Sentry, or any third-party tracking.
+- Health data is never logged to stdout, server logs, or error messages.
+- Period details are never included in any email or notification.
+- Private notes are never returned to parent accounts, at any sharing level.
+- The Nunito font is self-hosted in the build — no external font requests.
 - HTTPS enforced by Railway.
-- All tokens are Sanctum bearer tokens stored in localStorage.
 
-## Delete all data
+### Authentication
 
-To permanently erase all health data and user accounts:
+- Passwords are hashed with bcrypt (`Hash::make`). Never stored or logged in plaintext.
+- Login returns a Sanctum bearer token (30-day expiry by default).
+- Bearer tokens are stored in `localStorage` on the client.
+- Login is rate-limited to 5 attempts per minute per IP.
+- Logout revokes the current token immediately.
+
+### Authorization
+
+- Every API endpoint except `GET /api/health` and `POST /api/auth/login` requires a valid bearer token.
+- Child-only routes are guarded by `role:child` middleware.
+- Parent-only routes are guarded by `role:parent` middleware.
+- All child data operations (period logs, notes, cycle profile) are scoped to `$request->user()->cycleProfile` — the child's own profile. No ID is accepted from the frontend for these lookups.
+- Parent dashboard is scoped to the family the parent belongs to. A parent cannot query another family's data.
+- Note ownership is verified before update or delete: `$note->cycle_profile_id !== $profile->id`.
+
+### Sharing privacy
+
+- Sharing defaults to **off** for both parents.
+- Dad and mom sharing are independent boolean toggles.
+- The parent dashboard returns `{"shared": false}` if sharing is off — no health data is returned.
+- `share_level` controls what is visible when sharing is on: `basic` (dates only), `flow`, `symptoms`, `everything`.
+- `everything` still excludes private notes — notes are never sent to parents.
+
+### Data at rest
+
+- Note body text is encrypted with Laravel's built-in AES-256 encryption (requires `APP_KEY`). Stored as ciphertext in the database.
+
+### No public registration
+
+There is no registration endpoint or registration screen. Accounts can only be created via:
 
 ```bash
-php artisan dot:delete-all-data
+php artisan dot:create-family-users
 ```
 
-This command requires interactive confirmation and deletes everything: users, families, cycle profiles, period logs, symptom logs, and notes.
+### Rotating passwords
+
+```bash
+railway run --service=backend php artisan dot:create-family-users \
+  --child-email="child@yourdomain.com" \
+  --child-password="new-strong-password" \
+  --dad-email="dad@yourdomain.com" \
+  --dad-password="new-strong-password" \
+  --mom-email="mom@yourdomain.com" \
+  --mom-password="new-strong-password"
+```
+
+The command is idempotent — existing accounts are updated, not duplicated.
+
+### Revoking tokens
+
+To revoke all sessions for a user (e.g. lost device):
+
+```bash
+railway run --service=backend php artisan tinker
+# In tinker:
+\App\Models\User::where('email', 'child@yourdomain.com')->first()->tokens()->delete();
+```
+
+### Delete all data
+
+To permanently erase all health data and user accounts (run on Railway):
+
+```bash
+railway run --service=backend php artisan dot:delete-all-data
+```
+
+Deletes: users, families, family members, cycle profiles, period logs, symptom logs, notes, and all auth tokens.
+
+### Required environment variables
+
+| Variable               | Notes                                         |
+|------------------------|-----------------------------------------------|
+| `APP_KEY`              | Laravel encryption key — never commit this    |
+| `APP_ENV`              | Must be `production` on Railway               |
+| `APP_DEBUG`            | Must be `false` on Railway                    |
+| `DB_HOST` etc.         | Use Railway variable references `${{Postgres.PGHOST}}` |
+| `DB_SSLMODE`           | `require`                                     |
+| `FRONTEND_URL`         | Exact frontend URL — used for CORS allowlist  |
+| `SANCTUM_TOKEN_EXPIRY` | Token lifetime in minutes (default: 43200 = 30 days) |
+
+### What not to log
+
+- Passwords (in any form)
+- Bearer tokens
+- Period dates, flow values, symptoms, note content
+- User email addresses in health-related log lines
 
 ---
 
